@@ -22,6 +22,8 @@ public class Users {
     private String name;
     private String lastName;
     private String email;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private Role role;
     private String password;
     private boolean active;
@@ -29,6 +31,10 @@ public class Users {
     private LocalDateTime createDate;
     @UpdateTimestamp
     private LocalDateTime updateDate;
+    //inventario
+    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @JoinColumn(name = "inventory_id", nullable = true)
+    private Inventory inventory;
 
     public Users() {
     }
