@@ -24,7 +24,7 @@ public class Products {
     @UpdateTimestamp
     private LocalDateTime updated;
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id", nullable = true)
+    @JoinColumn(name = "products", nullable = true)
     private Inventory inventory;
 
 }

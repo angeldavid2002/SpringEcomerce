@@ -33,7 +33,7 @@ public class Users {
     private LocalDateTime updateDate;
     //inventario
     @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
-    @JoinColumn(name = "id", nullable = true)
+    @JoinColumn(name = "user", nullable = true)
     private Inventory inventory;
 
     public Users() {

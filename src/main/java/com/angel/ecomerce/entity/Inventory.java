@@ -19,12 +19,10 @@ public class Inventory {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // 1. CONEXIÓN HACIA EL USUARIO (Relación 1 a 1 Bidireccional)
-    @OneToOne(mappedBy = "id", fetch = FetchType.LAZY)
+    @OneToOne(mappedBy = "inventory")
     private Users user;
 
-    // 2. CONEXIÓN HACIA LOS PRODUCTOS (Relación 1 a Muchos)
-    @OneToMany(mappedBy = "id", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "inventory", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Products> products = new ArrayList<>();
 
     @CreationTimestamp
