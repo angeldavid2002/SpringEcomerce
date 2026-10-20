@@ -2,7 +2,9 @@ package com.angel.ecomerce.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
@@ -11,7 +13,8 @@ import java.time.LocalDateTime;
 @Setter
 @Entity
 @Table(name = "products")
-public class Products {
+@NoArgsConstructor
+public class Product {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -19,12 +22,17 @@ public class Products {
     private String description;
     private Double prize;
     private boolean active;
-    @UpdateTimestamp
+    @CreationTimestamp
     private LocalDateTime created;
     @UpdateTimestamp
     private LocalDateTime updated;
+
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "products", nullable = true)
+    @JoinColumn(name = "inventory_id", nullable = true)
     private Inventory inventory;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id", nullable =true)
+    private Category category;
 
 }
