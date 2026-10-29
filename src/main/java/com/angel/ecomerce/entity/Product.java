@@ -20,7 +20,7 @@ public class Product {
     private Long id;
     private String name;
     private String description;
-    private Double prize;
+    private Double price;
     private boolean active;
     @CreationTimestamp
     private LocalDateTime created;
