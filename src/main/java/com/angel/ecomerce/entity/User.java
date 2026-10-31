@@ -9,8 +9,8 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
-
-
+import java.util.ArrayList;
+import java.util.List;
 
 @Setter
 @Getter
@@ -28,20 +28,16 @@ public class User {
     private String password;
     private boolean active;
 
-    //
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role;
-    //
+
     @CreationTimestamp
     private LocalDateTime created;
-    //
+
     @UpdateTimestamp
     private LocalDateTime updated;
-    //inventario
-    //@OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
-    //@JoinColumn(name = "inventory_id", nullable = true)
-    //private Inventory inventory;
-    @OneToOne(mappedBy = "user")
-    private Inventory inventory;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<Address> addresses = new ArrayList<>();
 }
