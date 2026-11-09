@@ -12,21 +12,26 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
+@Table(name = "category")
 @Getter
 @Setter
-@Table(name = "category")
 @NoArgsConstructor
 public class Category {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(unique = true)
     private String name;
+
     private String description;
+
+    @Column(nullable = false)
     private boolean active = true;
 
     @CreationTimestamp
     private LocalDateTime created;
+
     @UpdateTimestamp
     private LocalDateTime updated;
 

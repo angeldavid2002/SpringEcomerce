@@ -7,10 +7,10 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 
-@Getter
-@Setter
 @Entity
 @Table(name = "order_items")
+@Getter
+@Setter
 @NoArgsConstructor
 public class OrderItem {
     @Id
@@ -28,6 +28,6 @@ public class OrderItem {
     @Column(nullable = false)
     private int quantity;
 
-    @Column(nullable = false, precision = 12, scale = 2)
+    @Column(name = "unit_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal unitPrice;
 }

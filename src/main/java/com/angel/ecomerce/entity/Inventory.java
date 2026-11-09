@@ -8,10 +8,10 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
-@Getter
-@Setter
 @Entity
 @Table(name = "inventory")
+@Getter
+@Setter
 @NoArgsConstructor
 public class Inventory {
     @Id
@@ -25,7 +25,7 @@ public class Inventory {
     @Column(nullable = false)
     private int stock;
 
-    @Column(nullable = false)
+    @Column(name = "min_stock", nullable = false)
     private int minStock;
 
     @UpdateTimestamp

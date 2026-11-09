@@ -12,25 +12,32 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-@Setter
-@Getter
 @Entity
-@NoArgsConstructor
 @Table(name = "users")
+@Getter
+@Setter
+@NoArgsConstructor
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     private String name;
+
+    @Column(name = "last_name")
     private String lastName;
+
+    @Column(unique = true)
     private String email;
+
     private String password;
-    private boolean active;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role;
+
+    @Column(nullable = false)
+    private boolean active = true;
 
     @CreationTimestamp
     private LocalDateTime created;
