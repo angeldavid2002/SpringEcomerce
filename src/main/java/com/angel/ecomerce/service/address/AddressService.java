@@ -43,7 +43,7 @@ public class AddressService implements IAddress {
 
     @Override
     public List<Address> getAll() {
-        return addressesRepository.findAll();
+        return addressesRepository.findAllByOrderByIdAsc();
     }
 
     @Override

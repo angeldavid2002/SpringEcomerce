@@ -48,12 +48,12 @@ public class UserService implements IUsers {
 
     @Override
     public List<User> getAll() {
-        return usersRepository.findAll();
+        return usersRepository.findAllByOrderByNameAsc();
     }
 
     @Override
     public List<User> getActive() {
-        return usersRepository.findByActiveTrue();
+        return usersRepository.findByActiveTrueOrderByNameAsc();
     }
 
     @Override

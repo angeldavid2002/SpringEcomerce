@@ -9,7 +9,7 @@ import java.util.Optional;
 public interface CategoriesRepository extends JpaRepository<Category, Long> {
     Optional<Category> findByNameIgnoreCase(String name);
 
-    boolean existsByNameIgnoreCase(String name);
+    List<Category> findAllByOrderByNameAsc();
 
-    List<Category> findByActiveTrue();
+    List<Category> findByActiveTrueOrderByNameAsc();
 }

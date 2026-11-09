@@ -29,12 +29,12 @@ public class CategoryService implements ICategory {
 
     @Override
     public List<Category> getAll() {
-        return categoriesRepository.findAll();
+        return categoriesRepository.findAllByOrderByNameAsc();
     }
 
     @Override
     public List<Category> getActive() {
-        return categoriesRepository.findByActiveTrue();
+        return categoriesRepository.findByActiveTrueOrderByNameAsc();
     }
 
     @Override
@@ -44,7 +44,7 @@ public class CategoryService implements ICategory {
             throw new IllegalStateException("No se pueden eliminar las categorías mientras existan productos asociados");
         }
         categoriesRepository.deleteAll();
-        return categoriesRepository.findAll();
+        return categoriesRepository.findAllByOrderByNameAsc();
     }
 
     @Override
