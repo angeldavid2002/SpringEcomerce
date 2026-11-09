@@ -6,13 +6,15 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface ProductsRepository extends JpaRepository<Product, Long> {
-    List<Product> findByCategoryId(Long categoryId);
-
-    List<Product> findByCategoryIdAndActiveTrue(Long categoryId);
-
-    List<Product> findByActiveTrue();
-
-    List<Product> findByNameContainingIgnoreCase(String name);
-
     boolean existsByCategoryId(Long categoryId);
+
+    List<Product> findAllByOrderByNameAsc();
+
+    List<Product> findByActiveTrueOrderByNameAsc();
+
+    List<Product> findByCategoryIdOrderByNameAsc(Long categoryId);
+
+    List<Product> findByCategoryIdAndActiveTrueOrderByNameAsc(Long categoryId);
+
+    List<Product> findByNameContainingIgnoreCaseOrderByNameAsc(String name);
 }

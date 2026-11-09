@@ -39,22 +39,22 @@ public class ProductsService implements IProducts {
 
     @Override
     public List<Product> getAll() {
-        return productsRepository.findAll();
+        return productsRepository.findAllByOrderByNameAsc();
     }
 
     @Override
     public List<Product> getActive() {
-        return productsRepository.findByActiveTrue();
+        return productsRepository.findByActiveTrueOrderByNameAsc();
     }
 
     @Override
     public List<Product> getByCategory(Long categoryId) {
-        return productsRepository.findByCategoryId(categoryId);
+        return productsRepository.findByCategoryIdOrderByNameAsc(categoryId);
     }
 
     @Override
     public List<Product> getActiveByCategory(Long categoryId) {
-        return productsRepository.findByCategoryIdAndActiveTrue(categoryId);
+        return productsRepository.findByCategoryIdAndActiveTrueOrderByNameAsc(categoryId);
     }
 
     @Override
@@ -62,7 +62,7 @@ public class ProductsService implements IProducts {
         if (name == null || name.isBlank()) {
             return List.of();
         }
-        return productsRepository.findByNameContainingIgnoreCase(name.trim());
+        return productsRepository.findByNameContainingIgnoreCaseOrderByNameAsc(name.trim());
     }
 
     @Override

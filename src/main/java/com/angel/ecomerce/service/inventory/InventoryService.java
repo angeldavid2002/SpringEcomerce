@@ -39,7 +39,7 @@ public class InventoryService implements IInventory {
 
     @Override
     public List<Inventory> getAll() {
-        return inventoriesRepository.findAll();
+        return inventoriesRepository.findAllByOrderByProductNameAsc();
     }
 
     @Override

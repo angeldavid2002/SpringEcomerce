@@ -12,6 +12,8 @@ public interface InventoriesRepository extends JpaRepository<Inventory, Long> {
 
     boolean existsByProductId(Long productId);
 
-    @Query("select i from Inventory i where i.stock <= i.minStock")
+    List<Inventory> findAllByOrderByProductNameAsc();
+
+    @Query("select i from Inventory i where i.stock <= i.minStock order by i.product.name asc")
     List<Inventory> findLowStock();
 }
