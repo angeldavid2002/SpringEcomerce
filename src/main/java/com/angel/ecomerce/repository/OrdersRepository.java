@@ -7,11 +7,13 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface OrdersRepository extends JpaRepository<Order, Long> {
-    List<Order> findByUserIdOrderByCreatedDesc(Long userId);
-
-    List<Order> findByStatus(OrderStatus status);
-
     boolean existsByUserId(Long userId);
 
     boolean existsByAddressId(Long addressId);
+
+    List<Order> findAllByOrderByCreatedDescIdDesc();
+
+    List<Order> findByUserIdOrderByCreatedDescIdDesc(Long userId);
+
+    List<Order> findByStatusOrderByCreatedDescIdDesc(OrderStatus status);
 }

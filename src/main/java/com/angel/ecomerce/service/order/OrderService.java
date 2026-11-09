@@ -68,17 +68,17 @@ public class OrderService implements IOrder {
 
     @Override
     public List<Order> getAll() {
-        return ordersRepository.findAll();
+        return ordersRepository.findAllByOrderByCreatedDescIdDesc();
     }
 
     @Override
     public List<Order> getByUserId(Long userId) {
-        return ordersRepository.findByUserIdOrderByCreatedDesc(userId);
+        return ordersRepository.findByUserIdOrderByCreatedDescIdDesc(userId);
     }
 
     @Override
     public List<Order> getByStatus(OrderStatus status) {
-        return ordersRepository.findByStatus(status);
+        return ordersRepository.findByStatusOrderByCreatedDescIdDesc(status);
     }
 
     @Override

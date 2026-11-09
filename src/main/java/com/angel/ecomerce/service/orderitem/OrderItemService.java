@@ -23,7 +23,7 @@ public class OrderItemService implements IOrderItem {
 
     @Override
     public List<OrderItem> getByOrderId(Long orderId) {
-        return orderItemsRepository.findByOrderId(orderId);
+        return orderItemsRepository.findByOrderIdOrderByIdAsc(orderId);
     }
 
     @Override
