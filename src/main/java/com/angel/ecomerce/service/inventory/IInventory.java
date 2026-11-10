@@ -14,7 +14,7 @@ public interface IInventory {
 
     Optional<Inventory> findByProductId(Long productId);
 
-    Optional<Inventory> updateById(Long id, Inventory updatedInventory);
+    Inventory updateById(Long id, Inventory updatedInventory);
 
     Inventory increaseStock(Long productId, int quantity);
 
@@ -24,7 +24,7 @@ public interface IInventory {
 
     List<Inventory> getLowStock();
 
-    String deleteById(Long id);
+    void deleteById(Long id);
 
-    String deleteByProductId(Long productId);
+    void deleteByProductId(Long productId);
 }

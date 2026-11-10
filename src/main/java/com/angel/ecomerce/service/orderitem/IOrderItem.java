@@ -17,5 +17,5 @@ public interface IOrderItem {
 
     Order removeItem(Long orderId, Long orderItemId);
 
-    String deleteById(Long orderItemId);
+    void deleteById(Long orderItemId);
 }

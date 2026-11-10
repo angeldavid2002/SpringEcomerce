@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 @Service
@@ -25,14 +26,23 @@ public class InventoryService implements IInventory {
     @Override
     @Transactional
     public Inventory save(Long productId, Inventory inventory) {
+        if (productId == null) {
+            throw new IllegalArgumentException("El producto es obligatorio");
+        }
+        if (inventory == null) {
+            throw new IllegalArgumentException("El inventario es obligatorio");
+        }
+        if (inventory.getId() != null) {
+            throw new IllegalArgumentException("Para actualizar un inventario use updateById");
+        }
+
         Product product = productsRepository.findById(productId)
-                .orElseThrow(() -> new IllegalArgumentException("No existe el producto con id " + productId));
+                .orElseThrow(() -> new NoSuchElementException("No existe el producto con id " + productId));
         if (inventoriesRepository.existsByProductId(productId)) {
             throw new IllegalArgumentException("El producto ya tiene un inventario registrado");
         }
 
         validate(inventory);
-        inventory.setId(null);
         inventory.setProduct(product);
         return inventoriesRepository.save(inventory);
     }
@@ -44,25 +54,39 @@ public class InventoryService implements IInventory {
 
     @Override
     public Optional<Inventory> findById(Long id) {
+        if (id == null) {
+            return Optional.empty();
+        }
         return inventoriesRepository.findById(id);
     }
 
     @Override
     public Optional<Inventory> findByProductId(Long productId) {
+        if (productId == null) {
+            return Optional.empty();
+        }
         return inventoriesRepository.findByProductId(productId);
     }
 
     @Override
     @Transactional
-    public Optional<Inventory> updateById(Long id, Inventory updatedInventory) {
-        validate(updatedInventory);
+    public Inventory updateById(Long id, Inventory updatedInventory) {
+        if (id == null) {
+            throw new IllegalArgumentException("El id del inventario es obligatorio");
+        }
+        if (updatedInventory == null) {
+            throw new IllegalArgumentException("El inventario es obligatorio");
+        }
 
         return inventoriesRepository.findById(id)
                 .map(existingInventory -> {
+                    validate(updatedInventory);
+
                     existingInventory.setStock(updatedInventory.getStock());
                     existingInventory.setMinStock(updatedInventory.getMinStock());
                     return inventoriesRepository.save(existingInventory);
-                });
+                })
+                .orElseThrow(() -> new NoSuchElementException("No existe un inventario con ese id"));
     }
 
     @Override
@@ -86,7 +110,7 @@ public class InventoryService implements IInventory {
 
         Inventory inventory = getByProductIdOrThrow(productId);
         if (inventory.getStock() < quantity) {
-            throw new IllegalArgumentException("Stock insuficiente para el producto con id " + productId);
+            throw new IllegalStateException("Stock insuficiente para el producto con id " + productId);
         }
         inventory.setStock(inventory.getStock() - quantity);
         return inventoriesRepository.save(inventory);
@@ -105,28 +129,34 @@ public class InventoryService implements IInventory {
 
     @Override
     @Transactional
-    public String deleteById(Long id) {
+    public void deleteById(Long id) {
+        if (id == null) {
+            throw new IllegalArgumentException("El id del inventario es obligatorio");
+        }
         if (!inventoriesRepository.existsById(id)) {
-            return "No existe un inventario con ese id";
+            throw new NoSuchElementException("No existe un inventario con ese id");
         }
         inventoriesRepository.deleteById(id);
-        return "Se eliminó exitosamente";
     }
 
     @Override
     @Transactional
-    public String deleteByProductId(Long productId) {
-        Optional<Inventory> inventory = inventoriesRepository.findByProductId(productId);
-        if (inventory.isEmpty()) {
-            return "No existe un inventario para ese producto";
+    public void deleteByProductId(Long productId) {
+        if (productId == null) {
+            throw new IllegalArgumentException("El producto es obligatorio");
         }
-        inventoriesRepository.delete(inventory.get());
-        return "Se eliminó exitosamente";
+
+        Inventory inventory = inventoriesRepository.findByProductId(productId)
+                .orElseThrow(() -> new NoSuchElementException("No existe un inventario para ese producto"));
+        inventoriesRepository.delete(inventory);
     }
 
     private Inventory getByProductIdOrThrow(Long productId) {
+        if (productId == null) {
+            throw new IllegalArgumentException("El producto es obligatorio");
+        }
         return inventoriesRepository.findByProductId(productId)
-                .orElseThrow(() -> new IllegalArgumentException("No existe inventario para el producto con id " + productId));
+                .orElseThrow(() -> new NoSuchElementException("No existe inventario para el producto con id " + productId));
     }
 
     private void validate(Inventory inventory) {

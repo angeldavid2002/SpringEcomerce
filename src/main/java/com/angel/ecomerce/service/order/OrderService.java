@@ -19,6 +19,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
 
@@ -50,12 +51,12 @@ public class OrderService implements IOrder {
             throw new IllegalArgumentException("El usuario y la dirección son obligatorios");
         }
         User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("No existe el usuario con id " + userId));
+                .orElseThrow(() -> new NoSuchElementException("No existe el usuario con id " + userId));
         if (!user.isActive()) {
             throw new IllegalArgumentException("El usuario está inactivo y no puede crear pedidos");
         }
         Address address = addressesRepository.findByIdAndUserId(addressId, userId)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new NoSuchElementException(
                         "No existe la dirección con id " + addressId + " para el usuario " + userId));
 
         Order order = new Order();
@@ -73,29 +74,41 @@ public class OrderService implements IOrder {
 
     @Override
     public List<Order> getByUserId(Long userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException("El usuario es obligatorio");
+        }
         return ordersRepository.findByUserIdOrderByCreatedDescIdDesc(userId);
     }
 
     @Override
     public List<Order> getByStatus(OrderStatus status) {
+        if (status == null) {
+            throw new IllegalArgumentException("El estado del pedido es obligatorio");
+        }
         return ordersRepository.findByStatusOrderByCreatedDescIdDesc(status);
     }
 
     @Override
     public Optional<Order> findById(Long id) {
+        if (id == null) {
+            return Optional.empty();
+        }
         return ordersRepository.findById(id);
     }
 
     @Override
     @Transactional
     public Order addItem(Long orderId, Long productId, int quantity) {
+        if (productId == null) {
+            throw new IllegalArgumentException("El producto es obligatorio");
+        }
         if (quantity <= 0) {
             throw new IllegalArgumentException("La cantidad debe ser mayor a cero");
         }
 
         Order order = getPendingOrder(orderId);
         Product product = productsRepository.findById(productId)
-                .orElseThrow(() -> new IllegalArgumentException("No existe el producto con id " + productId));
+                .orElseThrow(() -> new NoSuchElementException("No existe el producto con id " + productId));
         if (!product.isActive()) {
             throw new IllegalArgumentException("El producto no está activo");
         }
@@ -129,6 +142,9 @@ public class OrderService implements IOrder {
         if (quantity < 0) {
             throw new IllegalArgumentException("La cantidad no puede ser negativa");
         }
+        if (orderItemId == null) {
+            throw new IllegalArgumentException("El item del pedido es obligatorio");
+        }
 
         Order order = getPendingOrder(orderId);
         OrderItem item = getItem(order, orderItemId);
@@ -146,6 +162,10 @@ public class OrderService implements IOrder {
     @Override
     @Transactional
     public Order removeItem(Long orderId, Long orderItemId) {
+        if (orderItemId == null) {
+            throw new IllegalArgumentException("El item del pedido es obligatorio");
+        }
+
         Order order = getPendingOrder(orderId);
         OrderItem item = getItem(order, orderItemId);
 
@@ -161,8 +181,7 @@ public class OrderService implements IOrder {
             throw new IllegalArgumentException("El estado del pedido es obligatorio");
         }
 
-        Order order = ordersRepository.findById(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("No existe el pedido con id " + orderId));
+        Order order = getOrder(orderId);
 
         OrderStatus currentStatus = order.getStatus();
         if (currentStatus == status) {
@@ -192,35 +211,41 @@ public class OrderService implements IOrder {
 
     @Override
     @Transactional
-    public String deleteById(Long id) {
-        Optional<Order> optionalOrder = ordersRepository.findById(id);
-        if (optionalOrder.isEmpty()) {
-            return "No existe un pedido con ese id";
+    public void deleteById(Long id) {
+        if (id == null) {
+            throw new IllegalArgumentException("El id del pedido es obligatorio");
         }
 
-        Order order = optionalOrder.get();
+        Order order = ordersRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("No existe un pedido con ese id"));
         if (order.getStatus() != OrderStatus.PENDING) {
-            return "Solo se pueden eliminar pedidos en estado PENDING";
+            throw new IllegalStateException("Solo se pueden eliminar pedidos en estado PENDING");
         }
 
         ordersRepository.delete(order);
-        return "Se eliminó exitosamente";
     }
 
     private Order getPendingOrder(Long orderId) {
-        Order order = ordersRepository.findById(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("No existe el pedido con id " + orderId));
+        Order order = getOrder(orderId);
         if (order.getStatus() != OrderStatus.PENDING) {
-            throw new IllegalArgumentException("Solo se pueden modificar pedidos en estado PENDING");
+            throw new IllegalStateException("Solo se pueden modificar pedidos en estado PENDING");
         }
         return order;
+    }
+
+    private Order getOrder(Long orderId) {
+        if (orderId == null) {
+            throw new IllegalArgumentException("El id del pedido es obligatorio");
+        }
+        return ordersRepository.findById(orderId)
+                .orElseThrow(() -> new NoSuchElementException("No existe el pedido con id " + orderId));
     }
 
     private OrderItem getItem(Order order, Long orderItemId) {
         return order.getItems().stream()
                 .filter(item -> item.getId().equals(orderItemId))
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new NoSuchElementException(
                         "No existe el item con id " + orderItemId + " en el pedido " + order.getId()));
     }
 
@@ -233,15 +258,15 @@ public class OrderService implements IOrder {
 
     private void reserveStock(Order order) {
         if (order.getItems().isEmpty()) {
-            throw new IllegalArgumentException("No se puede pagar un pedido sin productos");
+            throw new IllegalStateException("No se puede pagar un pedido sin productos");
         }
 
         for (OrderItem item : order.getItems()) {
             Inventory inventory = inventoryService.findByProductId(item.getProduct().getId())
-                    .orElseThrow(() -> new IllegalArgumentException(
+                    .orElseThrow(() -> new IllegalStateException(
                             "No hay inventario para el producto " + item.getProduct().getName()));
             if (inventory.getStock() < item.getQuantity()) {
-                throw new IllegalArgumentException(
+                throw new IllegalStateException(
                         "Stock insuficiente para el producto " + item.getProduct().getName());
             }
         }

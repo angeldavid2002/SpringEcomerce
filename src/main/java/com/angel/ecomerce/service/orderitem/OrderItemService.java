@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 @Service
@@ -23,11 +24,17 @@ public class OrderItemService implements IOrderItem {
 
     @Override
     public List<OrderItem> getByOrderId(Long orderId) {
+        if (orderId == null) {
+            throw new IllegalArgumentException("El pedido es obligatorio");
+        }
         return orderItemsRepository.findByOrderIdOrderByIdAsc(orderId);
     }
 
     @Override
     public Optional<OrderItem> findById(Long id) {
+        if (id == null) {
+            return Optional.empty();
+        }
         return orderItemsRepository.findById(id);
     }
 
@@ -51,14 +58,13 @@ public class OrderItemService implements IOrderItem {
 
     @Override
     @Transactional
-    public String deleteById(Long orderItemId) {
-        Optional<OrderItem> optionalItem = orderItemsRepository.findById(orderItemId);
-        if (optionalItem.isEmpty()) {
-            return "No existe un item de pedido con ese id";
+    public void deleteById(Long orderItemId) {
+        if (orderItemId == null) {
+            throw new IllegalArgumentException("El id del item de pedido es obligatorio");
         }
 
-        OrderItem item = optionalItem.get();
+        OrderItem item = orderItemsRepository.findById(orderItemId)
+                .orElseThrow(() -> new NoSuchElementException("No existe un item de pedido con ese id"));
         orderService.removeItem(item.getOrder().getId(), orderItemId);
-        return "Se eliminó exitosamente";
     }
 }

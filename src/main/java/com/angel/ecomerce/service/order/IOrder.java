@@ -27,5 +27,5 @@ public interface IOrder {
 
     Order cancel(Long orderId);
 
-    String deleteById(Long id);
+    void deleteById(Long id);
 }
