@@ -15,7 +15,7 @@ import java.util.Optional;
 
 @Service
 @Transactional(readOnly = true)
-public class UserService implements IUsers {
+public class UserService implements IUser {
     private final UsersRepository usersRepository;
     private final OrdersRepository ordersRepository;
 

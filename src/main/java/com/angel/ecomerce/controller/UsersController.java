@@ -3,7 +3,7 @@ package com.angel.ecomerce.controller;
 import com.angel.ecomerce.dto.user.UserCreateRequest;
 import com.angel.ecomerce.dto.user.UserResponse;
 import com.angel.ecomerce.dto.user.UserUpdateRequest;
-import com.angel.ecomerce.service.users.IUsers;
+import com.angel.ecomerce.service.users.IUser;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,9 +15,9 @@ import java.util.NoSuchElementException;
 @RestController
 @RequestMapping("/users")
 public class UsersController {
-    private final IUsers usersService;
+    private final IUser usersService;
 
-    public UsersController(IUsers usersService) {
+    public UsersController(IUser usersService) {
         this.usersService = usersService;
     }
 

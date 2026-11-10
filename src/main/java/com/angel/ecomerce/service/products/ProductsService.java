@@ -16,7 +16,7 @@ import java.util.Optional;
 
 @Service
 @Transactional(readOnly = true)
-public class ProductsService implements IProducts {
+public class ProductsService implements IProduct {
     private final ProductsRepository productsRepository;
     private final CategoriesRepository categoriesRepository;
     private final OrderItemsRepository orderItemsRepository;

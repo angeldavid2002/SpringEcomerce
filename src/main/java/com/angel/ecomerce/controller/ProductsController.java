@@ -3,7 +3,7 @@ package com.angel.ecomerce.controller;
 import com.angel.ecomerce.dto.product.ProductCreateRequest;
 import com.angel.ecomerce.dto.product.ProductResponse;
 import com.angel.ecomerce.dto.product.ProductUpdateRequest;
-import com.angel.ecomerce.service.products.IProducts;
+import com.angel.ecomerce.service.products.IProduct;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,9 +15,9 @@ import java.util.NoSuchElementException;
 @RestController
 @RequestMapping("/products")
 public class ProductsController {
-    private final IProducts productsService;
+    private final IProduct productsService;
 
-    public ProductsController(IProducts productsService) {
+    public ProductsController(IProduct productsService) {
         this.productsService = productsService;
     }
 

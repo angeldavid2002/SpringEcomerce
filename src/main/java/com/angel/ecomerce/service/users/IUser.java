@@ -5,7 +5,7 @@ import com.angel.ecomerce.entity.User;
 import java.util.List;
 import java.util.Optional;
 
-public interface IUsers {
+public interface IUser {
     User save(User user);
 
     List<User> getAll();

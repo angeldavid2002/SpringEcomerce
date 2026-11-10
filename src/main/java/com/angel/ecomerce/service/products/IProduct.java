@@ -5,7 +5,7 @@ import com.angel.ecomerce.entity.Product;
 import java.util.List;
 import java.util.Optional;
 
-public interface IProducts {
+public interface IProduct {
     Product save(Product product);
 
     List<Product> getAll();
