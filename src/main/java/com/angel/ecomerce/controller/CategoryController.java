@@ -1,57 +1,80 @@
 package com.angel.ecomerce.controller;
 
+import com.angel.ecomerce.dto.category.CategoryCreateRequest;
+import com.angel.ecomerce.dto.category.CategoryResponse;
+import com.angel.ecomerce.dto.category.CategoryUpdateRequest;
 import com.angel.ecomerce.entity.Category;
 import com.angel.ecomerce.service.category.ICategory;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Optional;
-
+import java.util.NoSuchElementException;
 
 @RestController
-@RequestMapping("/category")
+@RequestMapping("/categories")
 public class CategoryController {
-    private final ICategory iCategory;
+    private final ICategory categoryService;
 
-    public CategoryController(ICategory iCategory) {
-        this.iCategory = iCategory;
+    public CategoryController(ICategory categoryService) {
+        this.categoryService = categoryService;
     }
 
     @GetMapping("/heartbeat")
-    public String heartbeat(){
+    public String heartbeat() {
         return "alive";
     }
 
-    @GetMapping("/all")
-    public List<Category> getAll(){
-        return iCategory.getAll();
+    @GetMapping
+    public List<CategoryResponse> getAll() {
+        return categoryService.getAll().stream()
+                .map(CategoryResponse::from)
+                .toList();
     }
 
-    @PostMapping("/save")
-    public Category save(@RequestBody Category category){
-        return iCategory.save(category);
+    @GetMapping("/active")
+    public List<CategoryResponse> getActive() {
+        return categoryService.getActive().stream()
+                .map(CategoryResponse::from)
+                .toList();
     }
 
-    @DeleteMapping("/delete-all")
-    public ResponseEntity<Void> deleteAll(){
-        iCategory.deleteAll();
+    @GetMapping("/{id}")
+    public CategoryResponse getById(@PathVariable Long id) {
+        return categoryService.findById(id)
+                .map(CategoryResponse::from)
+                .orElseThrow(() -> new NoSuchElementException("No existe una categoría con ese id"));
+    }
+
+    @GetMapping("/by-name")
+    public CategoryResponse getByName(@RequestParam String name) {
+        return categoryService.findByName(name)
+                .map(CategoryResponse::from)
+                .orElseThrow(() -> new NoSuchElementException("No existe una categoría con ese nombre"));
+    }
+
+    @PostMapping
+    public ResponseEntity<CategoryResponse> create(@Valid @RequestBody CategoryCreateRequest request) {
+        Category category = categoryService.save(request.toEntity());
+        return ResponseEntity.status(HttpStatus.CREATED).body(CategoryResponse.from(category));
+    }
+
+    @PutMapping("/{id}")
+    public CategoryResponse update(@PathVariable Long id, @Valid @RequestBody CategoryUpdateRequest request) {
+        return CategoryResponse.from(categoryService.updateById(id, request.toEntity()));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        categoryService.deleteById(id);
         return ResponseEntity.noContent().build();
     }
 
-    @DeleteMapping("/delete-by-id/{id}")
-    public ResponseEntity<Void> deleteById(@PathVariable Long id){
-        iCategory.deleteById(id);
+    @DeleteMapping
+    public ResponseEntity<Void> deleteAll() {
+        categoryService.deleteAll();
         return ResponseEntity.noContent().build();
-    }
-
-    @GetMapping("/find-by-id")
-    public Optional<Category> findById(@RequestParam Long id){
-        return iCategory.findById(id);
-    }
-
-    @PutMapping("/update")
-    public Category updateById(@RequestParam Long id, @RequestBody Category updatedCategory){
-        return iCategory.updateById(id,updatedCategory);
     }
 }
