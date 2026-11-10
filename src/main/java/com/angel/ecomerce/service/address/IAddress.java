@@ -16,7 +16,7 @@ public interface IAddress {
 
     Optional<Address> findByIdAndUserId(Long id, Long userId);
 
-    Optional<Address> updateById(Long id, Address updatedAddress);
+    Address updateById(Long id, Address updatedAddress);
 
-    String deleteById(Long id);
+    void deleteById(Long id);
 }

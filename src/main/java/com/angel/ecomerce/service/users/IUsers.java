@@ -16,9 +16,9 @@ public interface IUsers {
 
     Optional<User> findByEmail(String email);
 
-    Optional<User> updateById(Long id, User updatedUser);
+    User updateById(Long id, User updatedUser);
 
-    String deactivateById(Long id);
+    void deactivateById(Long id);
 
-    String deleteById(Long id);
+    void deleteById(Long id);
 }

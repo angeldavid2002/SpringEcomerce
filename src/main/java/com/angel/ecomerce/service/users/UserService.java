@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 @Service
@@ -26,6 +27,9 @@ public class UserService implements IUsers {
     @Override
     @Transactional
     public User save(User user) {
+        if (user == null) {
+            throw new IllegalArgumentException("El usuario es obligatorio");
+        }
         if (user.getId() != null) {
             throw new IllegalArgumentException("Para actualizar un usuario use updateById");
         }
@@ -33,6 +37,8 @@ public class UserService implements IUsers {
         String email = normalizeEmail(user.getEmail());
         validateEmail(email, null);
 
+        user.setName(trim(user.getName()));
+        user.setLastName(trim(user.getLastName()));
         user.setEmail(email);
         if (user.getRole() == null) {
             user.setRole(Role.CUSTOMER);
@@ -58,6 +64,9 @@ public class UserService implements IUsers {
 
     @Override
     public Optional<User> findById(Long id) {
+        if (id == null) {
+            return Optional.empty();
+        }
         return usersRepository.findById(id);
     }
 
@@ -71,14 +80,19 @@ public class UserService implements IUsers {
 
     @Override
     @Transactional
-    public Optional<User> updateById(Long id, User updatedUser) {
-        String email = normalizeEmail(updatedUser.getEmail());
-        validateEmail(email, id);
+    public User updateById(Long id, User updatedUser) {
+        requireId(id, "El id del usuario es obligatorio");
+        if (updatedUser == null) {
+            throw new IllegalArgumentException("El usuario es obligatorio");
+        }
 
         return usersRepository.findById(id)
                 .map(existingUser -> {
-                    existingUser.setName(updatedUser.getName());
-                    existingUser.setLastName(updatedUser.getLastName());
+                    String email = normalizeEmail(updatedUser.getEmail());
+                    validateEmail(email, id);
+
+                    existingUser.setName(trim(updatedUser.getName()));
+                    existingUser.setLastName(trim(updatedUser.getLastName()));
                     existingUser.setEmail(email);
                     if (updatedUser.getPassword() != null && !updatedUser.getPassword().isBlank()) {
                         existingUser.setPassword(updatedUser.getPassword());
@@ -88,32 +102,33 @@ public class UserService implements IUsers {
                     }
                     existingUser.setActive(updatedUser.isActive());
                     return usersRepository.save(existingUser);
-                });
-    }
-
-    @Override
-    @Transactional
-    public String deactivateById(Long id) {
-        return usersRepository.findById(id)
-                .map(user -> {
-                    user.setActive(false);
-                    usersRepository.save(user);
-                    return "Usuario desactivado exitosamente";
                 })
-                .orElse("No existe un usuario con ese id");
+                .orElseThrow(() -> new NoSuchElementException("No existe un usuario con ese id"));
     }
 
     @Override
     @Transactional
-    public String deleteById(Long id) {
+    public void deactivateById(Long id) {
+        requireId(id, "El id del usuario es obligatorio");
+
+        User user = usersRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("No existe un usuario con ese id"));
+        user.setActive(false);
+        usersRepository.save(user);
+    }
+
+    @Override
+    @Transactional
+    public void deleteById(Long id) {
+        requireId(id, "El id del usuario es obligatorio");
+
         if (!usersRepository.existsById(id)) {
-            return "No existe un usuario con ese id";
+            throw new NoSuchElementException("No existe un usuario con ese id");
         }
         if (ordersRepository.existsByUserId(id)) {
-            return "No se puede eliminar el usuario porque tiene pedidos asociados; desactívelo en su lugar";
+            throw new IllegalStateException("No se puede eliminar el usuario porque tiene pedidos asociados; desactívelo en su lugar");
         }
         usersRepository.deleteById(id);
-        return "Se eliminó exitosamente";
     }
 
     private String normalizeEmail(String email) {
@@ -129,5 +144,15 @@ public class UserService implements IUsers {
                 .ifPresent(existing -> {
                     throw new IllegalArgumentException("Ya existe un usuario con ese email");
                 });
+    }
+
+    private void requireId(Long id, String message) {
+        if (id == null) {
+            throw new IllegalArgumentException(message);
+        }
+    }
+
+    private String trim(String value) {
+        return value == null ? null : value.trim();
     }
 }

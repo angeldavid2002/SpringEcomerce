@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 @Service
@@ -32,11 +33,18 @@ public class AddressService implements IAddress {
         if (userId == null) {
             throw new IllegalArgumentException("El usuario es obligatorio");
         }
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("No existe el usuario con id " + userId));
+        if (address == null) {
+            throw new IllegalArgumentException("La dirección es obligatoria");
+        }
+        if (address.getId() != null) {
+            throw new IllegalArgumentException("Para actualizar una dirección use updateById");
+        }
 
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new NoSuchElementException("No existe el usuario con id " + userId));
+
+        normalize(address);
         validate(address);
-        address.setId(null);
         address.setUser(user);
         return addressesRepository.save(address);
     }
@@ -48,46 +56,74 @@ public class AddressService implements IAddress {
 
     @Override
     public List<Address> getByUserId(Long userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException("El usuario es obligatorio");
+        }
         return addressesRepository.findByUserIdOrderByIdAsc(userId);
     }
 
     @Override
     public Optional<Address> findById(Long id) {
+        if (id == null) {
+            return Optional.empty();
+        }
         return addressesRepository.findById(id);
     }
 
     @Override
     public Optional<Address> findByIdAndUserId(Long id, Long userId) {
+        if (id == null || userId == null) {
+            return Optional.empty();
+        }
         return addressesRepository.findByIdAndUserId(id, userId);
     }
 
     @Override
     @Transactional
-    public Optional<Address> updateById(Long id, Address updatedAddress) {
-        validate(updatedAddress);
+    public Address updateById(Long id, Address updatedAddress) {
+        if (id == null) {
+            throw new IllegalArgumentException("El id de la dirección es obligatorio");
+        }
+        if (updatedAddress == null) {
+            throw new IllegalArgumentException("La dirección es obligatoria");
+        }
 
         return addressesRepository.findById(id)
                 .map(existingAddress -> {
+                    normalize(updatedAddress);
+                    validate(updatedAddress);
+
                     existingAddress.setStreet(updatedAddress.getStreet());
                     existingAddress.setCity(updatedAddress.getCity());
                     existingAddress.setState(updatedAddress.getState());
                     existingAddress.setZipCode(updatedAddress.getZipCode());
                     existingAddress.setCountry(updatedAddress.getCountry());
                     return addressesRepository.save(existingAddress);
-                });
+                })
+                .orElseThrow(() -> new NoSuchElementException("No existe una dirección con ese id"));
     }
 
     @Override
     @Transactional
-    public String deleteById(Long id) {
+    public void deleteById(Long id) {
+        if (id == null) {
+            throw new IllegalArgumentException("El id de la dirección es obligatorio");
+        }
         if (!addressesRepository.existsById(id)) {
-            return "No existe una dirección con ese id";
+            throw new NoSuchElementException("No existe una dirección con ese id");
         }
         if (ordersRepository.existsByAddressId(id)) {
-            return "No se puede eliminar la dirección porque está asociada a pedidos";
+            throw new IllegalStateException("No se puede eliminar la dirección porque está asociada a pedidos");
         }
         addressesRepository.deleteById(id);
-        return "Se eliminó exitosamente";
+    }
+
+    private void normalize(Address address) {
+        address.setStreet(trim(address.getStreet()));
+        address.setCity(trim(address.getCity()));
+        address.setState(trim(address.getState()));
+        address.setZipCode(trim(address.getZipCode()));
+        address.setCountry(trim(address.getCountry()));
     }
 
     private void validate(Address address) {
@@ -100,5 +136,9 @@ public class AddressService implements IAddress {
         if (address.getCountry() == null || address.getCountry().isBlank()) {
             throw new IllegalArgumentException("El país es obligatorio");
         }
+    }
+
+    private String trim(String value) {
+        return value == null ? null : value.trim();
     }
 }
