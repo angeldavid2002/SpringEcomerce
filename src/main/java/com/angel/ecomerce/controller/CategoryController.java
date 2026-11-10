@@ -2,6 +2,7 @@ package com.angel.ecomerce.controller;
 
 import com.angel.ecomerce.entity.Category;
 import com.angel.ecomerce.service.category.ICategory;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -28,18 +29,20 @@ public class CategoryController {
     }
 
     @PostMapping("/save")
-    public Optional<Category> save(@RequestBody Category category){
-        return Optional.ofNullable(iCategory.save(category));
+    public Category save(@RequestBody Category category){
+        return iCategory.save(category);
     }
 
     @DeleteMapping("/delete-all")
-    public List<Category> deleteAll(){
-        return iCategory.deleteAll();
+    public ResponseEntity<Void> deleteAll(){
+        iCategory.deleteAll();
+        return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/delete-by-id/{id}")
-    public String deleteById(@PathVariable Long id){
-        return iCategory.deleteById(id);
+    public ResponseEntity<Void> deleteById(@PathVariable Long id){
+        iCategory.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/find-by-id")
@@ -48,7 +51,7 @@ public class CategoryController {
     }
 
     @PutMapping("/update")
-    public Optional<Category> updateById(@RequestParam Long id, @RequestBody Category updatedCategory){
+    public Category updateById(@RequestParam Long id, @RequestBody Category updatedCategory){
         return iCategory.updateById(id,updatedCategory);
     }
 }

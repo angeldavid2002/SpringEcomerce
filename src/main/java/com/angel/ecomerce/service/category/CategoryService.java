@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 @Service
@@ -23,7 +24,16 @@ public class CategoryService implements ICategory {
     @Override
     @Transactional
     public Category save(Category category) {
-        validate(category, category.getId());
+        if (category == null) {
+            throw new IllegalArgumentException("La categoría es obligatoria");
+        }
+        if (category.getId() != null) {
+            throw new IllegalArgumentException("Para actualizar una categoría use updateById");
+        }
+
+        normalize(category);
+        validate(category, null);
+        category.setActive(true);
         return categoriesRepository.save(category);
     }
 
@@ -39,29 +49,33 @@ public class CategoryService implements ICategory {
 
     @Override
     @Transactional
-    public List<Category> deleteAll() {
+    public void deleteAll() {
         if (productsRepository.count() > 0) {
             throw new IllegalStateException("No se pueden eliminar las categorías mientras existan productos asociados");
         }
         categoriesRepository.deleteAll();
-        return categoriesRepository.findAllByOrderByNameAsc();
     }
 
     @Override
     @Transactional
-    public String deleteById(Long id) {
+    public void deleteById(Long id) {
+        if (id == null) {
+            throw new IllegalArgumentException("El id de la categoría es obligatorio");
+        }
         if (!categoriesRepository.existsById(id)) {
-            return "No existen elementos para eliminar con ese id";
+            throw new NoSuchElementException("No existe una categoría con ese id");
         }
         if (productsRepository.existsByCategoryId(id)) {
-            return "No se puede eliminar la categoría porque tiene productos asociados";
+            throw new IllegalStateException("No se puede eliminar la categoría porque tiene productos asociados");
         }
         categoriesRepository.deleteById(id);
-        return "Se eliminó exitosamente";
     }
 
     @Override
     public Optional<Category> findById(Long id) {
+        if (id == null) {
+            return Optional.empty();
+        }
         return categoriesRepository.findById(id);
     }
 
@@ -75,25 +89,44 @@ public class CategoryService implements ICategory {
 
     @Override
     @Transactional
-    public Optional<Category> updateById(Long id, Category updatedCategory) {
+    public Category updateById(Long id, Category updatedCategory) {
+        if (id == null) {
+            throw new IllegalArgumentException("El id de la categoría es obligatorio");
+        }
+        if (updatedCategory == null) {
+            throw new IllegalArgumentException("La categoría es obligatoria");
+        }
+
         return categoriesRepository.findById(id)
                 .map(existingCategory -> {
+                    normalize(updatedCategory);
                     validate(updatedCategory, id);
+
                     existingCategory.setName(updatedCategory.getName());
                     existingCategory.setDescription(updatedCategory.getDescription());
                     existingCategory.setActive(updatedCategory.isActive());
                     return categoriesRepository.save(existingCategory);
-                });
+                })
+                .orElseThrow(() -> new NoSuchElementException("No existe una categoría con ese id"));
+    }
+
+    private void normalize(Category category) {
+        category.setName(trim(category.getName()));
+        category.setDescription(trim(category.getDescription()));
     }
 
     private void validate(Category category, Long id) {
         if (category.getName() == null || category.getName().isBlank()) {
             throw new IllegalArgumentException("El nombre de la categoría es obligatorio");
         }
-        categoriesRepository.findByNameIgnoreCase(category.getName().trim())
+        categoriesRepository.findByNameIgnoreCase(category.getName())
                 .filter(existing -> id == null || !existing.getId().equals(id))
                 .ifPresent(existing -> {
                     throw new IllegalArgumentException("Ya existe una categoría con ese nombre");
                 });
+    }
+
+    private String trim(String value) {
+        return value == null ? null : value.trim();
     }
 }

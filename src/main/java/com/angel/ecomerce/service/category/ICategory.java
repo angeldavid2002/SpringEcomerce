@@ -12,13 +12,13 @@ public interface ICategory {
 
     List<Category> getActive();
 
-    List<Category> deleteAll();
+    void deleteAll();
 
-    String deleteById(Long id);
+    void deleteById(Long id);
 
     Optional<Category> findById(Long id);
 
     Optional<Category> findByName(String name);
 
-    Optional<Category> updateById(Long id, Category updatedCategory);
+    Category updateById(Long id, Category updatedCategory);
 }

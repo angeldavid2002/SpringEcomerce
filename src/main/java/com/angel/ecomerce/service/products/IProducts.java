@@ -16,13 +16,13 @@ public interface IProducts {
 
     List<Product> getActiveByCategory(Long categoryId);
 
-    List<Product> searchByName(String name);
+    List<Product> searchActiveByName(String name);
 
     Optional<Product> findById(Long id);
 
-    Optional<Product> updateById(Long id, Product updatedProduct);
+    Product updateById(Long id, Product updatedProduct);
 
-    String deactivateById(Long id);
+    void deactivateById(Long id);
 
-    String deleteById(Long id);
+    void deleteById(Long id);
 }
