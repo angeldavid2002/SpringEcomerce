@@ -37,3 +37,7 @@ build/
 AGENTS.md
 PROJECT.md
 .opencode
+
+### Documentación local ###
+ENDPOINTS.md
+TESTS.md
