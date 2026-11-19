@@ -10,14 +10,16 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import static com.angel.ecomerce.support.TestFixtures.category;
+import static com.angel.ecomerce.support.TestFixtures.product;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -33,9 +35,11 @@ class ProductsControllerTest {
     @MockitoBean
     private IProduct productsService;
 
+    // --- Consultas ---
+
     @Test
     void searchReturnsMappedActiveProducts() throws Exception {
-        Product product = product(1L, "Libro de Java", true);
+        Product product = product(1L, "Libro de Java", "19.99", category(1L, "Libros"));
         given(productsService.searchActiveByName("libro")).willReturn(List.of(product));
 
         mockMvc.perform(get("/products/search").param("name", "libro"))
@@ -47,8 +51,30 @@ class ProductsControllerTest {
     }
 
     @Test
+    void getByCategoryReturnsMappedProducts() throws Exception {
+        Product product = product(1L, "Libro de Java", "19.99", category(1L, "Libros"));
+        given(productsService.getByCategory(1L)).willReturn(List.of(product));
+
+        mockMvc.perform(get("/products/category/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].categoryId").value(1))
+                .andExpect(jsonPath("$[0].categoryName").value("Libros"));
+    }
+
+    @Test
+    void getByIdReturns404WhenMissing() throws Exception {
+        given(productsService.findById(99L)).willReturn(Optional.empty());
+
+        mockMvc.perform(get("/products/99"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("No existe un producto con ese id"));
+    }
+
+    // --- Creación ---
+
+    @Test
     void createReturns201WithCategoryData() throws Exception {
-        Product product = product(1L, "Libro de Java", true);
+        Product product = product(1L, "Libro de Java", "19.99", category(1L, "Libros"));
         given(productsService.save(any(Product.class))).willReturn(product);
 
         mockMvc.perform(post("/products")
@@ -73,18 +99,12 @@ class ProductsControllerTest {
                 .andExpect(jsonPath("$.errors.price").value("El precio no puede ser negativo"));
     }
 
-    @Test
-    void getByIdReturns404WhenMissing() throws Exception {
-        given(productsService.findById(99L)).willReturn(Optional.empty());
-
-        mockMvc.perform(get("/products/99"))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.detail").value("No existe un producto con ese id"));
-    }
+    // --- Desactivación y borrado ---
 
     @Test
     void deactivateReturnsUpdatedProduct() throws Exception {
-        Product product = product(1L, "Libro de Java", false);
+        Category category = category(1L, "Libros");
+        Product product = product(1L, "Libro de Java", "19.99", category, false);
         given(productsService.findById(1L)).willReturn(Optional.of(product));
 
         mockMvc.perform(patch("/products/1/deactivate"))
@@ -94,21 +114,14 @@ class ProductsControllerTest {
         verify(productsService).deactivateById(1L);
     }
 
-    private Product product(Long id, String name, boolean active) {
-        Category category = new Category();
-        category.setId(1L);
-        category.setName("Libros");
-        category.setActive(true);
+    @Test
+    void deleteReturns409WhenProductHasOrderItems() throws Exception {
+        doThrow(new IllegalStateException(
+                "No se puede eliminar el producto porque está asociado a pedidos; desactívelo en su lugar"))
+                .when(productsService).deleteById(1L);
 
-        Product product = new Product();
-        product.setId(id);
-        product.setName(name);
-        product.setDescription("Descripción");
-        product.setPrice(new BigDecimal("19.99"));
-        product.setActive(active);
-        product.setCategory(category);
-        product.setCreated(LocalDateTime.now());
-        product.setUpdated(LocalDateTime.now());
-        return product;
+        mockMvc.perform(delete("/products/1"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").isNotEmpty());
     }
 }

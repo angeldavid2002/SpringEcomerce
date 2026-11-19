@@ -9,12 +9,13 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import static com.angel.ecomerce.support.TestFixtures.category;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -30,6 +31,8 @@ class CategoryControllerTest {
 
     @MockitoBean
     private ICategory categoryService;
+
+    // --- Creación ---
 
     @Test
     void createReturns201AndBody() throws Exception {
@@ -58,9 +61,14 @@ class CategoryControllerTest {
                 .andExpect(jsonPath("$.errors.name").value("El nombre es obligatorio"));
     }
 
+    // --- Consultas ---
+
     @Test
     void getAllReturnsMappedList() throws Exception {
-        given(categoryService.getAll()).willReturn(List.of(category(1L, "Libros"), category(2L, "Música")));
+        given(categoryService.getAll()).willReturn(List.of(
+                category(1L, "Libros"),
+                category(2L, "Música")
+        ));
 
         mockMvc.perform(get("/categories"))
                 .andExpect(status().isOk())
@@ -77,6 +85,8 @@ class CategoryControllerTest {
                 .andExpect(jsonPath("$.detail").value("No existe una categoría con ese id"));
     }
 
+    // --- Borrado ---
+
     @Test
     void deleteReturns204() throws Exception {
         mockMvc.perform(delete("/categories/1"))
@@ -85,14 +95,14 @@ class CategoryControllerTest {
         verify(categoryService).deleteById(1L);
     }
 
-    private Category category(Long id, String name) {
-        Category category = new Category();
-        category.setId(id);
-        category.setName(name);
-        category.setDescription("Descripción");
-        category.setActive(true);
-        category.setCreated(LocalDateTime.now());
-        category.setUpdated(LocalDateTime.now());
-        return category;
+    @Test
+    void deleteAllReturns409WhenProductsExist() throws Exception {
+        doThrow(new IllegalStateException("No se pueden eliminar las categorías mientras existan productos asociados"))
+                .when(categoryService).deleteAll();
+
+        mockMvc.perform(delete("/categories"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail")
+                        .value("No se pueden eliminar las categorías mientras existan productos asociados"));
     }
 }
