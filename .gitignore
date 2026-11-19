@@ -34,10 +34,12 @@ build/
 .vscode/
 
 ### OPENCODE ###
-AGENTS.md
-PROJECT.md
 .opencode
 
 ### Documentación local ###
+AGENTS.md
+PROJECT.md
 ENDPOINTS.md
+ESQUEMA.md
 TESTS.md
+LIMITACIONES.md
