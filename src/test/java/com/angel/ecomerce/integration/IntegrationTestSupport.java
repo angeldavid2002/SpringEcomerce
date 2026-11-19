@@ -1,15 +1,25 @@
 package com.angel.ecomerce.integration;
 
+import com.angel.ecomerce.security.JwtProperties;
 import com.jayway.jsonpath.JsonPath;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.JwsHeader;
+import org.springframework.security.oauth2.jwt.JwtClaimsSet;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -34,6 +44,43 @@ abstract class IntegrationTestSupport {
     @Autowired
     protected MockMvc mockMvc;
 
+    @Autowired
+    private JwtEncoder jwtEncoder;
+
+    @Autowired
+    private JwtProperties jwtProperties;
+
+    private String adminToken;
+
+    /**
+     * Ejecuta la petición con un token de ADMIN. Los escenarios de integración
+     * prueban reglas de negocio, no permisos; la autorización se cubre en
+     * SecurityIntegrationTest.
+     */
+    protected ResultActions performAsAdmin(MockHttpServletRequestBuilder request) throws Exception {
+        return mockMvc.perform(request.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken()));
+    }
+
+    protected String adminToken() {
+        if (adminToken == null) {
+            adminToken = tokenFor("admin@test.local", "ADMIN");
+        }
+        return adminToken;
+    }
+
+    protected String tokenFor(String subject, String role) {
+        Instant now = Instant.now();
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .issuer(jwtProperties.issuer())
+                .subject(subject)
+                .issuedAt(now)
+                .expiresAt(now.plus(jwtProperties.expiration()))
+                .claim("roles", List.of(role))
+                .build();
+        JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
+        return jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
+    }
+
     protected String suffix() {
         return UUID.randomUUID().toString().substring(0, 8);
     }
@@ -43,7 +90,7 @@ abstract class IntegrationTestSupport {
     }
 
     protected long createCategoryNamed(String name) throws Exception {
-        MvcResult result = mockMvc.perform(post("/categories")
+        MvcResult result = performAsAdmin(post("/categories")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"%s","description":"Categoría de prueba"}
@@ -54,7 +101,7 @@ abstract class IntegrationTestSupport {
     }
 
     protected long createProduct(long categoryId, String name, String price) throws Exception {
-        MvcResult result = mockMvc.perform(post("/products")
+        MvcResult result = performAsAdmin(post("/products")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"%s","description":"Producto de prueba","price":%s,"categoryId":%d}
@@ -65,7 +112,7 @@ abstract class IntegrationTestSupport {
     }
 
     protected ResultActions createInventory(long productId, int stock, int minStock) throws Exception {
-        return mockMvc.perform(post("/inventories")
+        return performAsAdmin(post("/inventories")
                         .param("productId", String.valueOf(productId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -80,7 +127,7 @@ abstract class IntegrationTestSupport {
 
     protected ResultActions createUserWithRole(String email, String role) throws Exception {
         String rolePart = role == null ? "" : ", \"role\":\"%s\"".formatted(role);
-        return mockMvc.perform(post("/users")
+        return performAsAdmin(post("/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"Cliente","lastName":"Prueba","email":"%s","password":"secreto123"%s}
@@ -89,7 +136,7 @@ abstract class IntegrationTestSupport {
     }
 
     protected long createAddress(long userId) throws Exception {
-        MvcResult result = mockMvc.perform(post("/addresses")
+        MvcResult result = performAsAdmin(post("/addresses")
                         .param("userId", String.valueOf(userId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -101,7 +148,7 @@ abstract class IntegrationTestSupport {
     }
 
     protected long createOrder(long userId, long addressId) throws Exception {
-        MvcResult result = mockMvc.perform(post("/orders")
+        MvcResult result = performAsAdmin(post("/orders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"userId":%d,"addressId":%d}
@@ -112,7 +159,7 @@ abstract class IntegrationTestSupport {
     }
 
     protected ResultActions addItem(long orderId, long productId, int quantity) throws Exception {
-        return mockMvc.perform(post("/orders/{orderId}/items", orderId)
+        return performAsAdmin(post("/orders/{orderId}/items", orderId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"productId":%d,"quantity":%d}
@@ -121,7 +168,7 @@ abstract class IntegrationTestSupport {
     }
 
     protected ResultActions updateItemQuantity(long orderId, long itemId, int quantity) throws Exception {
-        return mockMvc.perform(put("/orders/{orderId}/items/{itemId}", orderId, itemId)
+        return performAsAdmin(put("/orders/{orderId}/items/{itemId}", orderId, itemId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"quantity":%d}
@@ -130,7 +177,7 @@ abstract class IntegrationTestSupport {
     }
 
     protected ResultActions patchStatus(long orderId, String status) throws Exception {
-        return mockMvc.perform(patch("/orders/{orderId}/status", orderId)
+        return performAsAdmin(patch("/orders/{orderId}/status", orderId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"status":"%s"}
@@ -139,7 +186,7 @@ abstract class IntegrationTestSupport {
     }
 
     protected ResultActions cancel(long orderId) throws Exception {
-        return mockMvc.perform(patch("/orders/{orderId}/cancel", orderId))
+        return performAsAdmin(patch("/orders/{orderId}/cancel", orderId))
                 .andExpect(status().isOk());
     }
 

@@ -29,7 +29,7 @@ class CustomerIntegrationTest extends IntegrationTestSupport {
         assertEquals("CUSTOMER", JsonPath.read(result.getResponse().getContentAsString(), "$.role"));
         assertTrue((Boolean) JsonPath.read(result.getResponse().getContentAsString(), "$.active"));
 
-        mockMvc.perform(get("/users/by-email").param("email", rawEmail.toUpperCase(Locale.ROOT)))
+        performAsAdmin(get("/users/by-email").param("email", rawEmail.toUpperCase(Locale.ROOT)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value(normalizedEmail));
     }
@@ -40,7 +40,7 @@ class CustomerIntegrationTest extends IntegrationTestSupport {
         String email = "dup-" + suffix + "@example.com";
         createUserWithRole(email, "CUSTOMER");
 
-        mockMvc.perform(post("/users")
+        performAsAdmin(post("/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"Otra","email":"%s","password":"secreto123"}
@@ -56,13 +56,13 @@ class CustomerIntegrationTest extends IntegrationTestSupport {
         long otherId = createUser("other-" + suffix);
         long addressId = createAddress(ownerId);
 
-        mockMvc.perform(get("/addresses/{id}/user/{userId}", addressId, otherId))
+        performAsAdmin(get("/addresses/{id}/user/{userId}", addressId, otherId))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.detail").isNotEmpty());
 
         createOrder(ownerId, addressId);
 
-        mockMvc.perform(delete("/addresses/{id}", addressId))
+        performAsAdmin(delete("/addresses/{id}", addressId))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.detail").isNotEmpty());
     }

@@ -28,7 +28,7 @@ class OrderLifecycleIntegrationTest extends IntegrationTestSupport {
         assertEquals(39.98, decimalAt(itemResult, "$.totalAmount"), 0.001);
         long itemId = itemIdFrom(itemResult);
 
-        mockMvc.perform(get("/orders/{id}", orderId))
+        performAsAdmin(get("/orders/{id}", orderId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].productName").value("Product " + suffix))
                 .andExpect(jsonPath("$.status").value("PENDING"))
@@ -40,18 +40,18 @@ class OrderLifecycleIntegrationTest extends IntegrationTestSupport {
         patchStatus(orderId, "PAID")
                 .andExpect(jsonPath("$.status").value("PAID"));
 
-        mockMvc.perform(get("/inventories/product/{productId}", productId))
+        performAsAdmin(get("/inventories/product/{productId}", productId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.stock").value(7));
 
         cancel(orderId)
                 .andExpect(jsonPath("$.status").value("CANCELLED"));
 
-        mockMvc.perform(get("/inventories/product/{productId}", productId))
+        performAsAdmin(get("/inventories/product/{productId}", productId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.stock").value(10));
 
-        mockMvc.perform(delete("/orders/{orderId}", orderId))
+        performAsAdmin(delete("/orders/{orderId}", orderId))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.detail").isNotEmpty());
     }
@@ -74,7 +74,7 @@ class OrderLifecycleIntegrationTest extends IntegrationTestSupport {
         assertEquals(39.98, decimalAt(secondAdd, "$.totalAmount"), 0.001);
 
         long itemId = itemIdFrom(secondAdd);
-        mockMvc.perform(delete("/orders/{orderId}/items/{itemId}", orderId, itemId))
+        performAsAdmin(delete("/orders/{orderId}/items/{itemId}", orderId, itemId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items").isEmpty())
                 .andExpect(jsonPath("$.totalAmount").value(0.00));
@@ -99,7 +99,7 @@ class OrderLifecycleIntegrationTest extends IntegrationTestSupport {
 
         addItem(orderId, productId, 2);
 
-        mockMvc.perform(patch("/orders/{orderId}/status", orderId)
+        performAsAdmin(patch("/orders/{orderId}/status", orderId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"status":"PAID"}
@@ -107,7 +107,7 @@ class OrderLifecycleIntegrationTest extends IntegrationTestSupport {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.detail").isNotEmpty());
 
-        mockMvc.perform(get("/orders/{id}", orderId))
+        performAsAdmin(get("/orders/{id}", orderId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PENDING"));
     }
@@ -124,7 +124,7 @@ class OrderLifecycleIntegrationTest extends IntegrationTestSupport {
 
         addItem(orderId, productId, 1);
 
-        mockMvc.perform(patch("/orders/{orderId}/status", orderId)
+        performAsAdmin(patch("/orders/{orderId}/status", orderId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"status":"DELIVERED"}
@@ -132,7 +132,7 @@ class OrderLifecycleIntegrationTest extends IntegrationTestSupport {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").isNotEmpty());
 
-        mockMvc.perform(get("/orders/{id}", orderId))
+        performAsAdmin(get("/orders/{id}", orderId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PENDING"));
     }
@@ -150,7 +150,7 @@ class OrderLifecycleIntegrationTest extends IntegrationTestSupport {
         addItem(pendingOrderId, productId, 2);
         cancel(pendingOrderId);
 
-        mockMvc.perform(get("/inventories/product/{productId}", productId))
+        performAsAdmin(get("/inventories/product/{productId}", productId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.stock").value(10));
 
@@ -159,11 +159,11 @@ class OrderLifecycleIntegrationTest extends IntegrationTestSupport {
         patchStatus(shippedOrderId, "PAID");
         patchStatus(shippedOrderId, "SHIPPED");
 
-        mockMvc.perform(patch("/orders/{orderId}/cancel", shippedOrderId))
+        performAsAdmin(patch("/orders/{orderId}/cancel", shippedOrderId))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").isNotEmpty());
 
-        mockMvc.perform(get("/inventories/product/{productId}", productId))
+        performAsAdmin(get("/inventories/product/{productId}", productId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.stock").value(8));
     }
@@ -175,7 +175,7 @@ class OrderLifecycleIntegrationTest extends IntegrationTestSupport {
         long otherId = createUser("other-" + suffix);
         long addressId = createAddress(ownerId);
 
-        mockMvc.perform(post("/orders")
+        performAsAdmin(post("/orders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"userId":%d,"addressId":%d}

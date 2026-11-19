@@ -18,7 +18,7 @@ class CatalogIntegrationTest extends IntegrationTestSupport {
         String name = "Category " + suffix;
         createCategoryNamed(name);
 
-        mockMvc.perform(post("/categories")
+        performAsAdmin(post("/categories")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"%s"}
@@ -29,7 +29,7 @@ class CatalogIntegrationTest extends IntegrationTestSupport {
 
     @Test
     void productRequiresAnExistingCategory() throws Exception {
-        mockMvc.perform(post("/products")
+        performAsAdmin(post("/products")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"Producto sin categoría","price":19.99,"categoryId":999999999}
@@ -48,23 +48,23 @@ class CatalogIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.stock").value(2))
                 .andExpect(jsonPath("$.lowStock").value(true));
 
-        mockMvc.perform(get("/inventories/product/{productId}/low-stock", productId))
+        performAsAdmin(get("/inventories/product/{productId}/low-stock", productId))
                 .andExpect(status().isOk())
                 .andExpect(content().string("true"));
 
-        mockMvc.perform(patch("/inventories/product/{productId}/decrease", productId)
+        performAsAdmin(patch("/inventories/product/{productId}/decrease", productId)
                         .param("quantity", "1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.stock").value(1))
                 .andExpect(jsonPath("$.lowStock").value(true));
 
-        mockMvc.perform(patch("/inventories/product/{productId}/increase", productId)
+        performAsAdmin(patch("/inventories/product/{productId}/increase", productId)
                         .param("quantity", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.stock").value(3))
                 .andExpect(jsonPath("$.lowStock").value(false));
 
-        mockMvc.perform(patch("/inventories/product/{productId}/decrease", productId)
+        performAsAdmin(patch("/inventories/product/{productId}/decrease", productId)
                         .param("quantity", "99"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.detail").isNotEmpty());
@@ -77,16 +77,16 @@ class CatalogIntegrationTest extends IntegrationTestSupport {
         long categoryId = createCategory(suffix);
         long productId = createProduct(categoryId, productName, "19.99");
 
-        mockMvc.perform(get("/products/search").param("name", productName))
+        performAsAdmin(get("/products/search").param("name", productName))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].id").value((int) productId));
 
-        mockMvc.perform(patch("/products/{id}/deactivate", productId))
+        performAsAdmin(patch("/products/{id}/deactivate", productId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.active").value(false));
 
-        mockMvc.perform(get("/products/search").param("name", productName))
+        performAsAdmin(get("/products/search").param("name", productName))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
     }
