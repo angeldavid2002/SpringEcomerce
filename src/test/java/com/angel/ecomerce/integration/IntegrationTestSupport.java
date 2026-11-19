@@ -23,7 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * <p>Centraliza la creación de datos por HTTP y evita repetir el mismo flujo
  * en cada escenario. Cada test corre dentro de una transacción que se revierte.</p>
  */
-@SpringBootTest
+@SpringBootTest(properties = "app.seed.enabled=false")
 @AutoConfigureMockMvc
 @Transactional
 abstract class IntegrationTestSupport {
