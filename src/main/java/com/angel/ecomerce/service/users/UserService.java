@@ -4,6 +4,7 @@ import com.angel.ecomerce.entity.User;
 import com.angel.ecomerce.entity.enums.Role;
 import com.angel.ecomerce.repository.OrdersRepository;
 import com.angel.ecomerce.repository.UsersRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,10 +19,13 @@ import java.util.Optional;
 public class UserService implements IUser {
     private final UsersRepository usersRepository;
     private final OrdersRepository ordersRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public UserService(UsersRepository usersRepository, OrdersRepository ordersRepository) {
+    public UserService(UsersRepository usersRepository, OrdersRepository ordersRepository,
+                       PasswordEncoder passwordEncoder) {
         this.usersRepository = usersRepository;
         this.ordersRepository = ordersRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
@@ -36,10 +40,14 @@ public class UserService implements IUser {
 
         String email = normalizeEmail(user.getEmail());
         validateEmail(email, null);
+        if (user.getPassword() == null || user.getPassword().isBlank()) {
+            throw new IllegalArgumentException("La contraseña es obligatoria");
+        }
 
         user.setName(trim(user.getName()));
         user.setLastName(trim(user.getLastName()));
         user.setEmail(email);
+        user.setPassword(passwordEncoder.encode(user.getPassword()));
         if (user.getRole() == null) {
             user.setRole(Role.CUSTOMER);
         }
@@ -95,7 +103,7 @@ public class UserService implements IUser {
                     existingUser.setLastName(trim(updatedUser.getLastName()));
                     existingUser.setEmail(email);
                     if (updatedUser.getPassword() != null && !updatedUser.getPassword().isBlank()) {
-                        existingUser.setPassword(updatedUser.getPassword());
+                        existingUser.setPassword(passwordEncoder.encode(updatedUser.getPassword()));
                     }
                     if (updatedUser.getRole() != null) {
                         existingUser.setRole(updatedUser.getRole());
