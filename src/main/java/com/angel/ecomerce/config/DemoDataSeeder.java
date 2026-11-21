@@ -5,7 +5,6 @@ import com.angel.ecomerce.entity.enums.Role;
 import com.angel.ecomerce.repository.UsersRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -18,7 +17,8 @@ import java.util.Locale;
  * Crea dos usuarios de demostración, uno por rol, si todavía no existen.
  *
  * <p>Es idempotente y se puede desactivar con {@code app.seed.enabled=false}.
- * Las contraseñas se hashean y nunca se registran en el log.</p>
+ * Las credenciales vienen de {@link SeedProperties} (variables de entorno o
+ * .env), se hashean y nunca se registran en el log.</p>
  */
 @Component
 public class DemoDataSeeder implements ApplicationRunner {
@@ -27,36 +27,24 @@ public class DemoDataSeeder implements ApplicationRunner {
 
     private final UsersRepository usersRepository;
     private final PasswordEncoder passwordEncoder;
-    private final boolean enabled;
-    private final String adminEmail;
-    private final String adminPassword;
-    private final String customerEmail;
-    private final String customerPassword;
+    private final SeedProperties seed;
 
     public DemoDataSeeder(UsersRepository usersRepository,
                           PasswordEncoder passwordEncoder,
-                          @Value("${app.seed.enabled:true}") boolean enabled,
-                          @Value("${app.seed.admin-email:admin@example.com}") String adminEmail,
-                          @Value("${app.seed.admin-password:Admin1234!}") String adminPassword,
-                          @Value("${app.seed.customer-email:customer@example.com}") String customerEmail,
-                          @Value("${app.seed.customer-password:Customer1234!}") String customerPassword) {
+                          SeedProperties seed) {
         this.usersRepository = usersRepository;
         this.passwordEncoder = passwordEncoder;
-        this.enabled = enabled;
-        this.adminEmail = adminEmail;
-        this.adminPassword = adminPassword;
-        this.customerEmail = customerEmail;
-        this.customerPassword = customerPassword;
+        this.seed = seed;
     }
 
     @Override
     public void run(ApplicationArguments args) {
-        if (!enabled) {
+        if (!seed.enabled()) {
             log.info("Seed de usuarios demo desactivado");
             return;
         }
-        createIfMissing(adminEmail, adminPassword, "Admin", "Demo", Role.ADMIN);
-        createIfMissing(customerEmail, customerPassword, "Cliente", "Demo", Role.CUSTOMER);
+        createIfMissing(seed.adminEmail(), seed.adminPassword(), "Admin", "Demo", Role.ADMIN);
+        createIfMissing(seed.customerEmail(), seed.customerPassword(), "Cliente", "Demo", Role.CUSTOMER);
     }
 
     private void createIfMissing(String email, String password, String name, String lastName, Role role) {

@@ -3,7 +3,7 @@ package com.angel.ecomerce.config;
 import com.angel.ecomerce.security.JwtProperties;
 import com.angel.ecomerce.security.RestAccessDeniedHandler;
 import com.angel.ecomerce.security.RestAuthenticationEntryPoint;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
@@ -31,23 +31,29 @@ import javax.crypto.spec.SecretKeySpec;
  * autorización por rol declarada por ruta y verbo.
  */
 @Configuration
-@EnableConfigurationProperties(JwtProperties.class)
 public class SecurityConfig {
 
     @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+    public PasswordEncoder passwordEncoder(
+            @Value("${app.security.bcrypt-strength:10}") int strength) {
+        if (strength < 4 || strength > 31) {
+            throw new IllegalArgumentException(
+                    "app.security.bcrypt-strength (BCRYPT_STRENGTH) debe estar entre 4 y 31");
+        }
+        return new BCryptPasswordEncoder(strength);
     }
 
     @Bean
     public JwtEncoder jwtEncoder(JwtProperties properties) {
-        return NimbusJwtEncoder.withSecretKey(secretKey(properties)).build();
+        return NimbusJwtEncoder.withSecretKey(secretKey(properties))
+                .algorithm(properties.algorithm())
+                .build();
     }
 
     @Bean
     public JwtDecoder jwtDecoder(JwtProperties properties) {
         return NimbusJwtDecoder.withSecretKey(secretKey(properties))
-                .macAlgorithm(MacAlgorithm.HS256)
+                .macAlgorithm(properties.algorithm())
                 .build();
     }
 
@@ -95,6 +101,11 @@ public class SecurityConfig {
     }
 
     private SecretKey secretKey(JwtProperties properties) {
-        return new SecretKeySpec(properties.secretBytes(), "HmacSHA256");
+        String jcaName = switch (properties.algorithm()) {
+            case HS256 -> "HmacSHA256";
+            case HS384 -> "HmacSHA384";
+            case HS512 -> "HmacSHA512";
+        };
+        return new SecretKeySpec(properties.secretBytes(), jcaName);
     }
 }
