@@ -29,7 +29,7 @@ The schema is **not** created by Hibernate. Flyway runs the migrations in
 
 ### 2. Configure credentials
 
-The app reads `DB_USER` and `DB_PASS` from the environment. A template is included:
+The app reads `DB_USER`, `DB_PASS` and `JWT_SECRET` from the environment. A template is included:
 
 ```bash
 cp .env.example .env
@@ -39,16 +39,19 @@ cp .env.example .env
 # .env
 DB_USER=your_user
 DB_PASS=your_password
+JWT_SECRET=change-me-with-at-least-32-bytes-long!!
 ```
 
-`.env` is only a local file. Spring Boot does not read it on its own: load it in your IDE run
-configuration, export the variables in your shell, or pass them to Maven.
+`JWT_SECRET` is mandatory and must be at least 32 bytes; the application refuses to start without
+it. It signs the HS256 tokens. `.env` is only a local file. Spring Boot does not read it on its own:
+load it in your IDE run configuration, export the variables in your shell, or pass them to Maven.
 
 PowerShell:
 
 ```powershell
 $env:DB_USER = "your_user"
 $env:DB_PASS = "your_password"
+$env:JWT_SECRET = "change-me-with-at-least-32-bytes-long!!"
 .\mvnw.cmd spring-boot:run
 ```
 
@@ -57,10 +60,23 @@ Bash:
 ```bash
 export DB_USER=your_user
 export DB_PASS=your_password
+export JWT_SECRET=change-me-with-at-least-32-bytes-long!!
 ./mvnw spring-boot:run
 ```
 
-Defaults if the variables are missing: `user` / `password`.
+Defaults if `DB_USER` / `DB_PASS` are missing: `user` / `password`. There is no default for
+`JWT_SECRET`.
+
+On startup, an idempotent seeder creates two demo users when `app.seed.enabled` is `true` (the
+default):
+
+| Role | Email | Password |
+| --- | --- | --- |
+| `ADMIN` | `admin@example.com` | `Admin1234!` |
+| `CUSTOMER` | `customer@example.com` | `Customer1234!` |
+
+These are development credentials only. Set `SEED_ENABLED=false` (and change `JWT_SECRET`) outside
+local development.
 
 ### 3. Open the API
 
@@ -76,9 +92,10 @@ Defaults if the variables are missing: `user` / `password`.
 ./mvnw test          # Windows: .\mvnw.cmd test
 ```
 
-> **PostgreSQL is required for the test suite.** There is no test profile and no in-memory
-> database, so the `@SpringBootTest` tests fail if the database is not reachable. The controller
-> slice tests (`@WebMvcTest`) do not touch the database, but Maven runs the whole suite.
+> **PostgreSQL and `JWT_SECRET` are required for the test suite.** There is no test profile and no
+> in-memory database, so the `@SpringBootTest` tests fail if the database is not reachable or the
+> secret is missing. The controller slice tests (`@WebMvcTest`) do not touch the database, but Maven
+> runs the whole suite.
 
 A single test class or method:
 
@@ -96,10 +113,15 @@ A single test class or method:
   checksum validation fails at startup.
 - **If tables were created by Hibernate before Flyway**, migration `V1` will fail. In development,
   reset the schema with `DROP SCHEMA public CASCADE; CREATE SCHEMA public;` and start again.
-- **There is no authentication.** Every endpoint is open and the `role` field is data only.
-- **Passwords are stored in plain text.** This is a portfolio trade-off, not a production design.
+- **Authentication is required for writes and private resources.** Log in at `POST /auth/login` and
+  send `Authorization: Bearer <token>`. Catalog reads, the login endpoint and Swagger are public.
+- **Roles are enforced by path and HTTP method**, not per resource owner: a `CUSTOMER` can read any
+  order or address, not only their own.
+- **Passwords are hashed with BCrypt.** The user response still omits the field.
 - **There is no pagination.** List endpoints return every row.
 - **Stock is deducted when the order is paid**, not when an item is added.
+- **JWTs cannot be revoked.** A role change takes effect when the current token expires (one hour by
+  default).
 - `spring.jpa.show-sql=true` logs every query; expect verbose console output.
 - The order table is named `orders` because `order` is a reserved word in SQL.
 
@@ -107,11 +129,12 @@ A single test class or method:
 
 ## Tech stack
 
-- Spring Boot 4.1.1 (Web MVC, Data JPA, Validation, Flyway)
+- Spring Boot 4.1.1 (Web MVC, Data JPA, Validation, Flyway, Security)
 - Java 21, Maven Wrapper
 - PostgreSQL
 - Lombok
-- springdoc-openapi 3.1.0 (Swagger UI)
+- Spring Security with JWT (HS256) and BCrypt
+- springdoc-openapi 3.1.0 (Swagger UI with bearer auth)
 - JUnit 5, MockMvc, Mockito
 
 ---
@@ -127,7 +150,8 @@ flowchart TD
     Client["HTTP client / Swagger UI"]
 
     subgraph API["API layer"]
-        Controller["Controllers<br/>/categories /products /inventories<br/>/users /addresses /orders /order-items"]
+        Security["SecurityFilterChain<br/>JWT + role rules"]
+        Controller["Controllers<br/>/auth /categories /products /inventories<br/>/users /addresses /orders /order-items"]
         DTO["DTOs<br/>records + Bean Validation"]
         Handler["GlobalExceptionHandler<br/>ProblemDetail responses"]
     end
@@ -143,7 +167,8 @@ flowchart TD
         Flyway["Flyway migrations"]
     end
 
-    Client --> Controller
+    Client --> Security
+    Security --> Controller
     Controller --> DTO
     Controller --> Service
     DTO --> Controller
@@ -158,6 +183,8 @@ flowchart TD
 **Package layout** (`com.angel.ecomerce`):
 
 ```text
+config/            SecurityConfig, OpenApiConfig, DemoDataSeeder
+security/          JwtProperties, 401/403 handlers
 entity/            JPA entities and enums (Role, OrderStatus)
 repository/        Spring Data JPA interfaces
 service/<domain>/  I<Domain> contract + implementation
@@ -180,7 +207,12 @@ Errors are translated to HTTP by the global handler:
 | `NoSuchElementException` | `404 Not Found` |
 | `IllegalArgumentException` | `400 Bad Request` |
 | `IllegalStateException` | `409 Conflict` |
+| `BadCredentialsException` | `401 Unauthorized` |
 | Bean Validation errors | `400` with an `errors` map per field |
+
+The security filter chain answers `401` and `403` before the dispatcher, so those responses are
+written by dedicated handlers instead of `GlobalExceptionHandler`. Both use `application/problem+json`
+with the same shape.
 
 ---
 
@@ -294,8 +326,46 @@ pessimistic or optimistic locking, so concurrent payments can oversell.
 
 All routes are plural and return JSON. Full request/response schemas are available in Swagger UI.
 
+### Authentication and permissions
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"Admin1234!"}' | jq -r .token)
+```
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiJ9...",
+  "type": "Bearer",
+  "expiresIn": 3600
+}
+```
+
+Send the token as `Authorization: Bearer <token>`. The token contains `sub` (email), `roles`
+(`ADMIN` or `CUSTOMER`), `iss`, `iat` and `exp`. A missing, invalid or expired token returns `401`; a
+valid token without the required role returns `403`.
+
+| Resource | Public | Any authenticated role | `ADMIN` only |
+| --- | --- | --- | --- |
+| `POST /auth/login` | Yes | | |
+| Swagger (`/swagger`, `/v3/api-docs`) | Yes | | |
+| `GET /categories`, `GET /products` | Yes | | |
+| Mutations of `/categories` and `/products` | | | Yes |
+| `/inventories/**` | | | Yes |
+| `/users/**` (including creating users) | | | Yes |
+| `/addresses/**` | | Yes | |
+| `/orders`: create, get by id, by user, items, cancel | | Yes | |
+| `/orders`: global list, by status, `PATCH status`, `DELETE` | | | Yes |
+| `/order-items/**` | | | Yes |
+
+Log in with the demo accounts created by the seed (`admin@example.com` / `Admin1234!` and
+`customer@example.com` / `Customer1234!`). Unknown email, wrong password and inactive user all
+return the same `401` with `Credenciales inválidas`.
+
 | Resource | Base path | Endpoints |
 | --- | --- | ---: |
+| Auth | `/auth` | 1 |
 | Categories | `/categories` | 9 |
 | Products | `/products` | 10 |
 | Inventories | `/inventories` | 11 |
@@ -303,7 +373,7 @@ All routes are plural and return JSON. Full request/response schemas are availab
 | Addresses | `/addresses` | 7 |
 | Orders | `/orders` | 11 |
 | Order items | `/order-items` | 3 |
-| **Total** | | **59** |
+| **Total** | | **60** |
 
 ### Suggested order of use
 
@@ -326,41 +396,53 @@ Quick walkthrough with `curl` (bash, requires [`jq`](https://jqlang.github.io/jq
 
 ```bash
 BASE=http://localhost:8080
+TOKEN=$(curl -s -X POST $BASE/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"Admin1234!"}' | jq -r .token)
+AUTH="Authorization: Bearer $TOKEN"
 
 CATEGORY=$(curl -s -X POST $BASE/categories \
+  -H "$AUTH" \
   -H "Content-Type: application/json" \
   -d '{"name":"Books","description":"Books and magazines"}')
 CATEGORY_ID=$(echo "$CATEGORY" | jq -r .id)
 
 PRODUCT=$(curl -s -X POST $BASE/products \
+  -H "$AUTH" \
   -H "Content-Type: application/json" \
   -d "{\"name\":\"Java Book\",\"price\":19.99,\"categoryId\":$CATEGORY_ID}")
 PRODUCT_ID=$(echo "$PRODUCT" | jq -r .id)
 
 curl -s -X POST "$BASE/inventories?productId=$PRODUCT_ID" \
+  -H "$AUTH" \
   -H "Content-Type: application/json" \
   -d '{"stock":10,"minStock":2}'
 
 USER=$(curl -s -X POST $BASE/users \
+  -H "$AUTH" \
   -H "Content-Type: application/json" \
   -d '{"name":"Ana","email":"ana@example.com","password":"secret123"}')
 USER_ID=$(echo "$USER" | jq -r .id)
 
 ADDRESS=$(curl -s -X POST "$BASE/addresses?userId=$USER_ID" \
+  -H "$AUTH" \
   -H "Content-Type: application/json" \
   -d '{"street":"Main St 1","city":"Springfield","country":"US"}')
 ADDRESS_ID=$(echo "$ADDRESS" | jq -r .id)
 
 ORDER=$(curl -s -X POST $BASE/orders \
+  -H "$AUTH" \
   -H "Content-Type: application/json" \
   -d "{\"userId\":$USER_ID,\"addressId\":$ADDRESS_ID}")
 ORDER_ID=$(echo "$ORDER" | jq -r .id)
 
 curl -s -X POST "$BASE/orders/$ORDER_ID/items" \
+  -H "$AUTH" \
   -H "Content-Type: application/json" \
   -d "{\"productId\":$PRODUCT_ID,\"quantity\":2}"
 
 curl -s -X PATCH "$BASE/orders/$ORDER_ID/status" \
+  -H "$AUTH" \
   -H "Content-Type: application/json" \
   -d '{"status":"PAID"}'
 ```
@@ -385,10 +467,12 @@ curl -s -X PATCH "$BASE/orders/$ORDER_ID/status" \
 
 | Code | Meaning |
 | --- | --- |
-| `200` | Query, update, deactivate, payment, cancellation, item change |
+| `200` | Query, update, deactivate, payment, cancellation, item change, login |
 | `201` | Resource created |
 | `204` | Deleted, no body |
 | `400` | Validation, bad data, invalid transition, malformed JSON |
+| `401` | Missing or invalid credentials, missing or invalid token |
+| `403` | Valid token without the required role |
 | `404` | Missing resource |
 | `409` | Stock conflict, non-`PENDING` order, protected history |
 
@@ -408,11 +492,23 @@ Errors use `ProblemDetail`:
 
 > Validation messages are in Spanish on purpose, to keep the domain language consistent.
 
+A `401` uses the same shape:
+
+```json
+{
+  "type": "about:blank",
+  "title": "No autorizado",
+  "status": 401,
+  "detail": "Se requiere un token válido",
+  "instance": "/orders"
+}
+```
+
 ---
 
 ## Tests
 
-The suite is split by module instead of living in a single file. There are 56 tests.
+The suite is split by module instead of living in a single file. There are 66 tests.
 
 | Type | Class | Tests | What it covers |
 | --- | --- | ---: | --- |
@@ -424,13 +520,17 @@ The suite is split by module instead of living in a single file. There are 56 te
 | Slice | `AddressesControllerTest` | 6 | Create, validation, ownership, delete rules |
 | Slice | `OrdersControllerTest` | 7 | Create, invalid status, items, status change, cancel, delete |
 | Slice | `OrderItemControllerTest` | 3 | List by order, missing item, delete |
+| Slice | `AuthControllerTest` | 3 | Login response, email validation, bad credentials |
 | Integration | `CatalogIntegrationTest` | 4 | Unique category, product FK, low stock/overdraft, active search |
 | Integration | `CustomerIntegrationTest` | 3 | Email normalization, duplicate email, address ownership |
 | Integration | `OrderLifecycleIntegrationTest` | 6 | Full purchase, totals, stock, invalid transitions, ownership |
+| Integration | `SecurityIntegrationTest` | 7 | Public reads, `401`/`403` problem details, admin access, real login |
 
-- **Slice tests** use `@WebMvcTest` + `@MockitoBean`: they check the HTTP contract without a database.
+- **Slice tests** use `@WebMvcTest` + `@MockitoBean` with `addFilters = false`: they check the HTTP
+  contract without a database or the security chain.
 - **Integration tests** use a shared `@SpringBootTest` + `@AutoConfigureMockMvc` + `@Transactional`
-  base (`IntegrationTestSupport`), so each scenario rolls back. Helpers build entities over HTTP.
+  base (`IntegrationTestSupport`), so each scenario rolls back. Helpers build entities over HTTP and
+  sign a real admin token for business scenarios. `SecurityIntegrationTest` covers authorization.
 - `TestFixtures` centralizes the entity builders used by the slice tests.
 
 Test sources:
@@ -439,7 +539,7 @@ Test sources:
 src/test/java/com/angel/ecomerce/
 ├── EcomerceApplicationTests.java
 ├── controller/        # one class per module
-├── integration/       # catalog, customers, order lifecycle + shared base
+├── integration/       # catalog, customers, order lifecycle, security + shared base
 └── support/           # TestFixtures
 ```
 
@@ -459,12 +559,14 @@ ecomerce/
     ├── main/
     │   ├── java/com/angel/ecomerce/
     │   │   ├── EcomerceApplication.java
+    │   │   ├── config/
     │   │   ├── controller/
     │   │   ├── dto/
     │   │   ├── entity/
     │   │   │   └── enums/
     │   │   ├── exception/
     │   │   ├── repository/
+    │   │   ├── security/
     │   │   └── service/
     │   └── resources/
     │       ├── application.properties
@@ -484,8 +586,12 @@ ecomerce/
 
 These are deliberate scope decisions for a portfolio project:
 
-- No authentication or authorization; the API is completely open.
-- Passwords are stored in plain text. The user response omits the field, but nothing hashes it.
+- Authorization is role-based, not ownership-based: a `CUSTOMER` can read any order or address, not
+  only their own. There is no `/orders/me`.
+- No token revocation or refresh tokens. A role change takes effect when the current token expires
+  (one hour by default).
+- JWT uses a single static HS256 secret, without rotation or `kid`.
+- No HTTPS, CORS, rate limiting or security headers; the API is meant to run locally.
 - No pagination, filtering or sorting beyond the few search endpoints.
 - No concurrency control on stock; two simultaneous payments can oversell.
 - Stock is deducted at payment time, not reserved when items are added.
@@ -495,7 +601,7 @@ These are deliberate scope decisions for a portfolio project:
 - Categories have no dedicated deactivation endpoint; use `PUT` with `active: false`.
 - Deleting history is intentionally blocked, so test data must be cleaned in reverse order or with SQL.
 - No Docker, CI pipeline, linter or formatter.
-- The test suite depends on a running PostgreSQL instance.
+- The test suite depends on a running PostgreSQL instance and `JWT_SECRET`.
 
 ---
 
