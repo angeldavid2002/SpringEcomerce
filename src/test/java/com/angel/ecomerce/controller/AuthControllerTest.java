@@ -36,7 +36,7 @@ class AuthControllerTest {
         mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email":"admin@example.com","password":"Admin1234!"}
+                                {"email":"admin@example.com","password":"secreto123"}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").value("jwt-demo"))
