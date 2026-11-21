@@ -27,9 +27,10 @@ The schema is **not** created by Hibernate. Flyway runs the migrations in
 `src/main/resources/db/migration` automatically on startup, and Hibernate validates the result
 (`ddl-auto=validate`). A fresh database is enough.
 
-### 2. Configure credentials
+### 2. Configure environment variables
 
-The app reads `DB_USER`, `DB_PASS` and `JWT_SECRET` from the environment. A template is included:
+Secrets and algorithms live in environment variables. For local development, `application.properties`
+imports the `.env` file automatically (it is ignored by Git), so you only need to create it:
 
 ```bash
 cp .env.example .env
@@ -37,46 +38,55 @@ cp .env.example .env
 
 ```properties
 # .env
+DB_URL=jdbc:postgresql://localhost:5432/ecomerce
 DB_USER=your_user
 DB_PASS=your_password
-JWT_SECRET=change-me-with-at-least-32-bytes-long!!
+
+SEED_ENABLED=true
+SEED_ADMIN_EMAIL=admin@example.com
+SEED_ADMIN_PASSWORD=Admin1234!
+SEED_CUSTOMER_EMAIL=customer@example.com
+SEED_CUSTOMER_PASSWORD=Customer1234!
+
+JWT_SECRET=replace-with-a-random-secret
+JWT_ISSUER=ecomerce
+JWT_EXPIRATION=PT1H
+JWT_ALGORITHM=HS256
+
+BCRYPT_STRENGTH=10
 ```
 
-`JWT_SECRET` is mandatory and must be at least 32 bytes; the application refuses to start without
-it. It signs the HS256 tokens. `.env` is only a local file. Spring Boot does not read it on its own:
-load it in your IDE run configuration, export the variables in your shell, or pass them to Maven.
+`spring.config.import=optional:file:.env[.properties]` loads `.env` as a properties file. Real
+environment variables still work and take precedence, so CI and production can inject them without a
+`.env` file.
 
-PowerShell:
+| Variable | Required | Default | Purpose |
+| --- | --- | --- | --- |
+| `DB_URL` | No | `jdbc:postgresql://localhost:5432/ecomerce` | JDBC URL |
+| `DB_USER` | Yes | — | Database user |
+| `DB_PASS` | Yes | — | Database password |
+| `SEED_ENABLED` | No | `false` | Creates the two demo users on startup |
+| `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` | If the seed is enabled | — | Demo `ADMIN` credentials |
+| `SEED_CUSTOMER_EMAIL` / `SEED_CUSTOMER_PASSWORD` | If the seed is enabled | — | Demo `CUSTOMER` credentials |
+| `JWT_SECRET` | Yes | — | HMAC signing secret. Minimum: 32 bytes (HS256), 48 (HS384), 64 (HS512) |
+| `JWT_ISSUER` | No | `ecomerce` | `iss` claim |
+| `JWT_EXPIRATION` | No | `PT1H` | Token lifetime (ISO-8601 duration) |
+| `JWT_ALGORITHM` | No | `HS256` | `HS256`, `HS384` or `HS512` |
+| `BCRYPT_STRENGTH` | No | `10` | BCrypt cost, from 4 to 31 |
 
-```powershell
-$env:DB_USER = "your_user"
-$env:DB_PASS = "your_password"
-$env:JWT_SECRET = "change-me-with-at-least-32-bytes-long!!"
-.\mvnw.cmd spring-boot:run
-```
+The application refuses to start if `JWT_SECRET` is missing or too short for the selected algorithm,
+or if the seed is enabled without its four credentials.
 
-Bash:
-
-```bash
-export DB_USER=your_user
-export DB_PASS=your_password
-export JWT_SECRET=change-me-with-at-least-32-bytes-long!!
-./mvnw spring-boot:run
-```
-
-Defaults if `DB_USER` / `DB_PASS` are missing: `user` / `password`. There is no default for
-`JWT_SECRET`.
-
-On startup, an idempotent seeder creates two demo users when `app.seed.enabled` is `true` (the
-default):
+On startup, an idempotent seeder creates two demo users when `SEED_ENABLED=true`. With the values
+from `.env.example`:
 
 | Role | Email | Password |
 | --- | --- | --- |
 | `ADMIN` | `admin@example.com` | `Admin1234!` |
 | `CUSTOMER` | `customer@example.com` | `Customer1234!` |
 
-These are development credentials only. Set `SEED_ENABLED=false` (and change `JWT_SECRET`) outside
-local development.
+These are development credentials only. Keep `SEED_ENABLED=false` (and use a random `JWT_SECRET`)
+outside local development.
 
 ### 3. Open the API
 
@@ -92,10 +102,11 @@ local development.
 ./mvnw test          # Windows: .\mvnw.cmd test
 ```
 
-> **PostgreSQL and `JWT_SECRET` are required for the test suite.** There is no test profile and no
-> in-memory database, so the `@SpringBootTest` tests fail if the database is not reachable or the
-> secret is missing. The controller slice tests (`@WebMvcTest`) do not touch the database, but Maven
-> runs the whole suite.
+> **PostgreSQL and the database credentials are required for the test suite.** There is no test
+> profile and no in-memory database, so the `@SpringBootTest` tests fail if the database is not
+> reachable or `DB_USER` / `DB_PASS` are missing. The tests supply their own `app.jwt.secret`, so
+> `JWT_SECRET` is not needed for `mvnw test`. The controller slice tests (`@WebMvcTest`) do not touch
+> the database, but Maven runs the whole suite.
 
 A single test class or method:
 
@@ -133,7 +144,7 @@ A single test class or method:
 - Java 21, Maven Wrapper
 - PostgreSQL
 - Lombok
-- Spring Security with JWT (HS256) and BCrypt
+- Spring Security with HMAC JWT (HS256/HS384/HS512) and BCrypt
 - springdoc-openapi 3.1.0 (Swagger UI with bearer auth)
 - JUnit 5, MockMvc, Mockito
 
@@ -359,9 +370,10 @@ valid token without the required role returns `403`.
 | `/orders`: global list, by status, `PATCH status`, `DELETE` | | | Yes |
 | `/order-items/**` | | | Yes |
 
-Log in with the demo accounts created by the seed (`admin@example.com` / `Admin1234!` and
-`customer@example.com` / `Customer1234!`). Unknown email, wrong password and inactive user all
-return the same `401` with `Credenciales inválidas`.
+Log in with the demo accounts created by the seed (`.env.example` uses `admin@example.com` /
+`Admin1234!` and `customer@example.com` / `Customer1234!`; change them in `.env` if you prefer).
+Unknown email, wrong password and inactive user all return the same `401` with
+`Credenciales inválidas`.
 
 | Resource | Base path | Endpoints |
 | --- | --- | ---: |
@@ -590,7 +602,8 @@ These are deliberate scope decisions for a portfolio project:
   only their own. There is no `/orders/me`.
 - No token revocation or refresh tokens. A role change takes effect when the current token expires
   (one hour by default).
-- JWT uses a single static HS256 secret, without rotation or `kid`.
+- JWT uses a single static HMAC secret (HS256 by default, configurable through `JWT_ALGORITHM`),
+  without rotation or `kid`.
 - No HTTPS, CORS, rate limiting or security headers; the API is meant to run locally.
 - No pagination, filtering or sorting beyond the few search endpoints.
 - No concurrency control on stock; two simultaneous payments can oversell.
@@ -601,7 +614,7 @@ These are deliberate scope decisions for a portfolio project:
 - Categories have no dedicated deactivation endpoint; use `PUT` with `active: false`.
 - Deleting history is intentionally blocked, so test data must be cleaned in reverse order or with SQL.
 - No Docker, CI pipeline, linter or formatter.
-- The test suite depends on a running PostgreSQL instance and `JWT_SECRET`.
+- The test suite depends on a running PostgreSQL instance and the database credentials.
 
 ---
 
