@@ -1,5 +1,7 @@
 # E-commerce REST API
 
+[![CI](https://github.com/angeldavid2002/SpringEcomerce/actions/workflows/ci.yml/badge.svg)](https://github.com/angeldavid2002/SpringEcomerce/actions/workflows/ci.yml)
+
 A small, focused e-commerce backend built with **Spring Boot 4.1.1** and **Java 21**.
 It exposes a REST API for a product catalog, customers, addresses, inventory and a complete order
 lifecycle with stock control. The project is a portfolio piece: the goal is to show a clean layered
@@ -543,6 +545,8 @@ The suite is split by module instead of living in a single file. There are 66 te
 - **Integration tests** use a shared `@SpringBootTest` + `@AutoConfigureMockMvc` + `@Transactional`
   base (`IntegrationTestSupport`), so each scenario rolls back. Helpers build entities over HTTP and
   sign a real admin token for business scenarios. `SecurityIntegrationTest` covers authorization.
+- **CI** runs the whole suite on every push and pull request against a PostgreSQL 18 service
+  container (`.github/workflows/ci.yml`), so the project can be verified without a local database.
 - `TestFixtures` centralizes the entity builders used by the slice tests.
 
 Test sources:
