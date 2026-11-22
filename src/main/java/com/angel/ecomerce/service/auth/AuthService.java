@@ -7,7 +7,6 @@ import com.angel.ecomerce.security.JwtProperties;
 import com.angel.ecomerce.service.users.IUser;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
@@ -59,7 +58,7 @@ public class AuthService implements IAuth {
                 .expiresAt(issuedAt.plus(properties.expiration()))
                 .claim("roles", List.of(user.getRole().name()))
                 .build();
-        JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
+        JwsHeader header = JwsHeader.with(properties.algorithm()).build();
 
         String token = jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
         return TokenResponse.bearer(token, properties.expiration());
