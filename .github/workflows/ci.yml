@@ -50,3 +50,19 @@ jobs:
           DB_PASS: ecomerce
           SEED_ENABLED: "false"
         run: ./mvnw -B test
+
+  docker:
+    name: Build the container image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Validate the compose file
+        env:
+          JWT_SECRET: ci-secret-with-at-least-32-bytes!!
+        run: docker compose config -q
+
+      - name: Build the image
+        run: docker build -t ecomerce:ci .
