@@ -18,6 +18,26 @@ architecture and a handful of well-implemented business rules, not to cover ever
 | Java | 21+ |
 | PostgreSQL | 14+ (developed against 18) |
 | Maven | not required, the Maven Wrapper is included |
+| Docker (optional) | 24+ with Compose v2, only for the containerized setup |
+
+### Docker Compose (optional)
+
+If Docker is available, this replaces steps 1–3:
+
+```bash
+cp .env.example .env
+# edit .env and set a real JWT_SECRET
+docker compose up --build
+```
+
+The API is served at `http://localhost:8080` and Swagger at `/swagger`. PostgreSQL is published on
+`localhost:5433` to avoid clashing with a local instance, and its data lives in the `postgres-data`
+volume. The compose file mounts that volume at `/var/lib/postgresql`, as required by the PostgreSQL 18
+image.
+
+### Local setup
+
+If you prefer to run the API on your machine, follow steps 1–4.
 
 ### 1. Create the database
 
@@ -149,6 +169,7 @@ A single test class or method:
 - Spring Security with HMAC JWT (HS256/HS384/HS512) and BCrypt
 - springdoc-openapi 3.1.0 (Swagger UI with bearer auth)
 - JUnit 5, MockMvc, Mockito
+- Dockerfile (multi-stage) and Docker Compose for the API and PostgreSQL
 
 ---
 
