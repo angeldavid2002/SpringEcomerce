@@ -636,7 +636,10 @@ These are deliberate scope decisions for a portfolio project:
   (one hour by default).
 - JWT uses a single static HMAC secret (HS256 by default, configurable through `JWT_ALGORITHM`),
   without rotation or `kid`.
-- No HTTPS, CORS, rate limiting or security headers; the API is meant to run locally.
+- CORS is implemented via `CorsConfigurationSource`: the allowed origin is configurable through
+  `app.cors.allowed-origins` (default `http://localhost:3000`), so a React frontend on another port
+  can consume the API.
+- No HTTPS, rate limiting or security headers; the API is meant to run locally.
 - No pagination, filtering or sorting beyond the few search endpoints.
 - No concurrency control on stock; two simultaneous payments can oversell.
 - Stock is deducted at payment time, not reserved when items are added.
