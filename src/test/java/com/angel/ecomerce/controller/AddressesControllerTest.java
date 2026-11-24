@@ -2,6 +2,7 @@ package com.angel.ecomerce.controller;
 
 import com.angel.ecomerce.entity.Address;
 import com.angel.ecomerce.entity.User;
+import com.angel.ecomerce.security.OwnershipGuard;
 import com.angel.ecomerce.service.address.IAddress;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +37,9 @@ class AddressesControllerTest {
 
     @MockitoBean
     private IAddress addressService;
+
+    @MockitoBean
+    private OwnershipGuard ownershipGuard;
 
     // --- Creación ---
 
@@ -72,6 +76,19 @@ class AddressesControllerTest {
     // --- Consultas ---
 
     @Test
+    void getMyAddressesReturnsCurrentUserAddresses() throws Exception {
+        User user = user(1L, "ana@example.com");
+        given(ownershipGuard.currentUserId()).willReturn(1L);
+        given(addressService.getByUserId(1L))
+                .willReturn(List.of(address(10L, user)));
+
+        mockMvc.perform(get("/addresses/me"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(10))
+                .andExpect(jsonPath("$[0].userId").value(1));
+    }
+
+    @Test
     void getByUserReturnsList() throws Exception {
         User user = user(1L, "ana@example.com");
         given(addressService.getByUserId(1L))
@@ -97,6 +114,8 @@ class AddressesControllerTest {
 
     @Test
     void deleteReturns409WhenAddressHasOrders() throws Exception {
+        User user = user(1L, "ana@example.com");
+        given(addressService.findById(10L)).willReturn(Optional.of(address(10L, user)));
         doThrow(new IllegalStateException(
                 "No se puede eliminar la dirección porque está asociada a pedidos"))
                 .when(addressService).deleteById(10L);
@@ -108,6 +127,9 @@ class AddressesControllerTest {
 
     @Test
     void deleteReturns204WhenAddressHasNoOrders() throws Exception {
+        User user = user(1L, "ana@example.com");
+        given(addressService.findById(10L)).willReturn(Optional.of(address(10L, user)));
+
         mockMvc.perform(delete("/addresses/10"))
                 .andExpect(status().isNoContent());
 

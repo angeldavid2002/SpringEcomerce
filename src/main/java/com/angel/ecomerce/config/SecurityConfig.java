@@ -86,6 +86,7 @@ public class SecurityConfig {
                         .permitAll()
                         .requestMatchers("/categories", "/categories/**", "/products", "/products/**").hasRole("ADMIN")
                         .requestMatchers("/inventories/**", "/users/**", "/order-items/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/addresses").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/orders", "/orders/status/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/orders/*/status").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/orders/*").hasRole("ADMIN")

@@ -6,6 +6,7 @@ import com.angel.ecomerce.entity.Order;
 import com.angel.ecomerce.entity.Product;
 import com.angel.ecomerce.entity.User;
 import com.angel.ecomerce.entity.enums.OrderStatus;
+import com.angel.ecomerce.security.OwnershipGuard;
 import com.angel.ecomerce.service.order.IOrder;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +15,9 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.List;
+import java.util.Optional;
 
 import static com.angel.ecomerce.support.TestFixtures.address;
 import static com.angel.ecomerce.support.TestFixtures.category;
@@ -41,7 +45,23 @@ class OrdersControllerTest {
     @MockitoBean
     private IOrder orderService;
 
+    @MockitoBean
+    private OwnershipGuard ownershipGuard;
+
     // --- Creación y consultas ---
+
+    @Test
+    void getMyOrdersReturnsCurrentUserOrders() throws Exception {
+        User user = user(1L, "ana@example.com");
+        Address address = address(1L, user);
+        given(ownershipGuard.currentUserId()).willReturn(1L);
+        given(orderService.getByUserId(1L))
+                .willReturn(List.of(order(1L, user, address, OrderStatus.PENDING, "0.00")));
+
+        mockMvc.perform(get("/orders/me"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].userId").value(1));
+    }
 
     @Test
     void createReturns201PendingOrder() throws Exception {
@@ -74,6 +94,7 @@ class OrdersControllerTest {
     @Test
     void addItemReturnsUpdatedOrder() throws Exception {
         Order order = orderWithItem(2, "39.98");
+        given(orderService.findById(1L)).willReturn(Optional.of(order));
         given(orderService.addItem(1L, 1L, 2)).willReturn(order);
 
         mockMvc.perform(post("/orders/1/items")
@@ -91,6 +112,7 @@ class OrdersControllerTest {
     @Test
     void updateItemQuantityReturnsUpdatedOrder() throws Exception {
         Order order = orderWithItem(3, "59.97");
+        given(orderService.findById(1L)).willReturn(Optional.of(order));
         given(orderService.updateItemQuantity(1L, 10L, 3)).willReturn(order);
 
         mockMvc.perform(put("/orders/1/items/10")
@@ -125,8 +147,9 @@ class OrdersControllerTest {
     void cancelReturnsCancelledOrder() throws Exception {
         User user = user(1L, "ana@example.com");
         Address address = address(1L, user);
-        given(orderService.cancel(1L))
-                .willReturn(order(1L, user, address, OrderStatus.CANCELLED, "39.98"));
+        Order cancelled = order(1L, user, address, OrderStatus.CANCELLED, "39.98");
+        given(orderService.findById(1L)).willReturn(Optional.of(cancelled));
+        given(orderService.cancel(1L)).willReturn(cancelled);
 
         mockMvc.perform(patch("/orders/1/cancel"))
                 .andExpect(status().isOk())

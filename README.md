@@ -388,10 +388,16 @@ valid token without the required role returns `403`.
 | Mutations of `/categories` and `/products` | | | Yes |
 | `/inventories/**` | | | Yes |
 | `/users/**` (including creating users) | | | Yes |
-| `/addresses/**` | | Yes | |
-| `/orders`: create, get by id, by user, items, cancel | | Yes | |
+| `GET /addresses` (global list) | | | Yes |
+| `GET /orders/me`, `GET /addresses/me` | | Own resources | |
+| `/orders`: create, get by id, by user, items, cancel | | Own resources | |
+| `/addresses`: get by id, by user, create, update, delete | | Own resources | |
 | `/orders`: global list, by status, `PATCH status`, `DELETE` | | | Yes |
 | `/order-items/**` | | | Yes |
+
+Ownership is checked from the token `sub` (email): a `CUSTOMER` can only read or modify their own
+orders and addresses. Requesting someone else's resource by id returns `404` (so the API does not
+reveal that the id exists); trying to act as another user returns `403`. `ADMIN` bypasses these checks.
 
 Log in with the demo accounts created by the seed (`.env.example` uses `admin@example.com` /
 `Admin1234!` and `customer@example.com` / `Customer1234!`; change them in `.env` if you prefer).
@@ -405,10 +411,10 @@ Unknown email, wrong password and inactive user all return the same `401` with
 | Products | `/products` | 10 |
 | Inventories | `/inventories` | 11 |
 | Users | `/users` | 8 |
-| Addresses | `/addresses` | 7 |
-| Orders | `/orders` | 11 |
+| Addresses | `/addresses` | 8 |
+| Orders | `/orders` | 12 |
 | Order items | `/order-items` | 3 |
-| **Total** | | **60** |
+| **Total** | | **62** |
 
 ### Suggested order of use
 
@@ -543,7 +549,7 @@ A `401` uses the same shape:
 
 ## Tests
 
-The suite is split by module instead of living in a single file. There are 66 tests.
+The suite is split by module instead of living in a single file. There are 82 tests.
 
 | Type | Class | Tests | What it covers |
 | --- | --- | ---: | --- |
@@ -552,14 +558,15 @@ The suite is split by module instead of living in a single file. There are 66 te
 | Slice | `ProductsControllerTest` | 7 | Search, category filter, create, deactivate, delete conflict |
 | Slice | `InventoryControllerTest` | 7 | Create, validation, low stock, stock movements, delete |
 | Slice | `UsersControllerTest` | 6 | Create, email validation, lookup, deactivate, delete conflict |
-| Slice | `AddressesControllerTest` | 6 | Create, validation, ownership, delete rules |
-| Slice | `OrdersControllerTest` | 7 | Create, invalid status, items, status change, cancel, delete |
+| Slice | `AddressesControllerTest` | 7 | Create, validation, own addresses, delete rules |
+| Slice | `OrdersControllerTest` | 8 | Create, invalid status, items, status change, cancel, delete |
 | Slice | `OrderItemControllerTest` | 3 | List by order, missing item, delete |
 | Slice | `AuthControllerTest` | 3 | Login response, email validation, bad credentials |
 | Integration | `CatalogIntegrationTest` | 4 | Unique category, product FK, low stock/overdraft, active search |
 | Integration | `CustomerIntegrationTest` | 3 | Email normalization, duplicate email, address ownership |
-| Integration | `OrderLifecycleIntegrationTest` | 6 | Full purchase, totals, stock, invalid transitions, ownership |
+| Integration | `OrderLifecycleIntegrationTest` | 6 | Full purchase, totals, stock, invalid transitions, address ownership |
 | Integration | `SecurityIntegrationTest` | 7 | Public reads, `401`/`403` problem details, admin access, real login |
+| Integration | `OwnershipIntegrationTest` | 14 | `/me` endpoints, cross-user access to orders and addresses, `ADMIN` bypass |
 
 - **Slice tests** use `@WebMvcTest` + `@MockitoBean` with `addFilters = false`: they check the HTTP
   contract without a database or the security chain.
@@ -623,8 +630,8 @@ ecomerce/
 
 These are deliberate scope decisions for a portfolio project:
 
-- Authorization is role-based, not ownership-based: a `CUSTOMER` can read any order or address, not
-  only their own. There is no `/orders/me`.
+- Ownership is enforced for orders and addresses, but the token is still a static bearer: a role change
+  takes effect when the current token expires.
 - No token revocation or refresh tokens. A role change takes effect when the current token expires
   (one hour by default).
 - JWT uses a single static HMAC secret (HS256 by default, configurable through `JWT_ALGORITHM`),
@@ -638,7 +645,9 @@ These are deliberate scope decisions for a portfolio project:
 - No endpoint to edit items from `/order-items`; use the `/orders` routes.
 - Categories have no dedicated deactivation endpoint; use `PUT` with `active: false`.
 - Deleting history is intentionally blocked, so test data must be cleaned in reverse order or with SQL.
-- No Docker, CI pipeline, linter or formatter.
+- Docker and CI are configured (multi-stage `Dockerfile`, `docker-compose.yml`, GitHub Actions with a
+  PostgreSQL service and an image build), but the compose stack has not been started locally yet and
+  there is no linter or formatter.
 - The test suite depends on a running PostgreSQL instance and the database credentials.
 
 ---
