@@ -10,22 +10,22 @@ import java.util.Optional;
 public interface ProductsRepository extends JpaRepository<Product, Long> {
     boolean existsByCategoryId(Long categoryId);
 
-    @EntityGraph(attributePaths = "category")
+    @EntityGraph(attributePaths = {"category", "inventory"})
     List<Product> findAllByOrderByNameAsc();
 
-    @EntityGraph(attributePaths = "category")
+    @EntityGraph(attributePaths = {"category", "inventory"})
     List<Product> findByActiveTrueOrderByNameAsc();
 
-    @EntityGraph(attributePaths = "category")
+    @EntityGraph(attributePaths = {"category", "inventory"})
     List<Product> findByCategoryIdOrderByNameAsc(Long categoryId);
 
-    @EntityGraph(attributePaths = "category")
+    @EntityGraph(attributePaths = {"category", "inventory"})
     List<Product> findByCategoryIdAndActiveTrueOrderByNameAsc(Long categoryId);
 
-    @EntityGraph(attributePaths = "category")
+    @EntityGraph(attributePaths = {"category", "inventory"})
     List<Product> findByNameContainingIgnoreCaseAndActiveTrueOrderByNameAsc(String name);
 
     @Override
-    @EntityGraph(attributePaths = "category")
+    @EntityGraph(attributePaths = {"category", "inventory"})
     Optional<Product> findById(Long id);
 }

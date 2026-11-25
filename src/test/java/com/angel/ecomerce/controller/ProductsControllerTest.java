@@ -15,7 +15,9 @@ import java.util.List;
 import java.util.Optional;
 
 import static com.angel.ecomerce.support.TestFixtures.category;
+import static com.angel.ecomerce.support.TestFixtures.inventory;
 import static com.angel.ecomerce.support.TestFixtures.product;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
@@ -61,6 +63,29 @@ class ProductsControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].categoryId").value(1))
                 .andExpect(jsonPath("$[0].categoryName").value("Libros"));
+    }
+
+    @Test
+    void getByIdIncludesStockAndAvailability() throws Exception {
+        Product product = product(1L, "Libro de Java", "19.99", category(1L, "Libros"));
+        product.setInventory(inventory(1L, product, 7, 2));
+        given(productsService.findById(1L)).willReturn(Optional.of(product));
+
+        mockMvc.perform(get("/products/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.stock").value(7))
+                .andExpect(jsonPath("$.available").value(true));
+    }
+
+    @Test
+    void getByIdWithoutInventoryReturnsNullStock() throws Exception {
+        Product product = product(1L, "Libro de Java", "19.99", category(1L, "Libros"));
+        given(productsService.findById(1L)).willReturn(Optional.of(product));
+
+        mockMvc.perform(get("/products/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.stock").value(nullValue()))
+                .andExpect(jsonPath("$.available").value(false));
     }
 
     @Test

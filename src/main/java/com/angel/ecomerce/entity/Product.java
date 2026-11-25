@@ -36,6 +36,9 @@ public class Product {
     @Column(nullable = false)
     private boolean active = true;
 
+    @OneToOne(mappedBy = "product", fetch = FetchType.LAZY)
+    private Inventory inventory;
+
     @CreationTimestamp
     private LocalDateTime created;
 

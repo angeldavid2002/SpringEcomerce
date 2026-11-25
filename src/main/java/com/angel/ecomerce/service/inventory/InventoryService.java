@@ -44,6 +44,7 @@ public class InventoryService implements IInventory {
 
         validate(inventory);
         inventory.setProduct(product);
+        product.setInventory(inventory);
         return inventoriesRepository.save(inventory);
     }
 

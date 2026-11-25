@@ -1,6 +1,7 @@
 package com.angel.ecomerce.dto.product;
 
 import com.angel.ecomerce.entity.Category;
+import com.angel.ecomerce.entity.Inventory;
 import com.angel.ecomerce.entity.Product;
 
 import java.math.BigDecimal;
@@ -15,11 +16,15 @@ public record ProductResponse(
         boolean active,
         Long categoryId,
         String categoryName,
+        Integer stock,
+        boolean available,
         LocalDateTime created,
         LocalDateTime updated
 ) {
     public static ProductResponse from(Product product) {
         Category category = product.getCategory();
+        Inventory inventory = product.getInventory();
+        Integer stock = inventory == null ? null : inventory.getStock();
         return new ProductResponse(
                 product.getId(),
                 product.getName(),
@@ -29,6 +34,8 @@ public record ProductResponse(
                 product.isActive(),
                 category == null ? null : category.getId(),
                 category == null ? null : category.getName(),
+                stock,
+                stock != null && stock > 0,
                 product.getCreated(),
                 product.getUpdated()
         );

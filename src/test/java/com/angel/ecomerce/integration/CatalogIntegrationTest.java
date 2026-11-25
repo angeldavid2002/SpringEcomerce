@@ -90,4 +90,16 @@ class CatalogIntegrationTest extends IntegrationTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
     }
+
+    @Test
+    void publicCatalogExposesStockWithoutAuthentication() throws Exception {
+        long categoryId = createCategory(suffix());
+        long productId = createProduct(categoryId, "Visible " + suffix(), "19.99");
+        createInventory(productId, 10, 2);
+
+        mockMvc.perform(get("/products/{id}", productId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.stock").value(10))
+                .andExpect(jsonPath("$.available").value(true));
+    }
 }
