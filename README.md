@@ -319,6 +319,10 @@ erDiagram
 - Inventory is removed with its product (`ON DELETE CASCADE`).
 - Money is `BigDecimal(12, 2)`.
 
+`ProductResponse` includes `stock` and `available` (`stock > 0`), so the public catalog can show
+availability without exposing `/inventories` (still `ADMIN` only). `stock` is `null` when the product
+has no inventory row.
+
 ---
 
 ## Order lifecycle
@@ -344,7 +348,8 @@ Rules enforced by `OrderService`:
 - `unitPrice` is frozen from the product price at the moment the item is added.
 - `totalAmount` is recalculated as `sum(quantity * unitPrice)` after every change.
 - Paying requires at least one item, an existing inventory and enough stock; otherwise `409` and the
-  order stays `PENDING`.
+  order stays `PENDING`. The owner pays with `POST /orders/{id}/pay`; changing the status to
+  `SHIPPED`, `DELIVERED` or `CANCELLED` remains `ADMIN`-only through `PATCH /orders/{id}/status`.
 - Sending the same status twice is idempotent: no transition and no stock movement.
 - Cancelling an already `CANCELLED` order is idempotent.
 - `SHIPPED` and `DELIVERED` orders cannot be cancelled (`400`).
@@ -380,9 +385,20 @@ Send the token as `Authorization: Bearer <token>`. The token contains `sub` (ema
 (`ADMIN` or `CUSTOMER`), `iss`, `iat` and `exp`. A missing, invalid or expired token returns `401`; a
 valid token without the required role returns `403`.
 
+New customers can self-register without a token. The role is always forced to `CUSTOMER` (a `role`
+field in the body is ignored), and the response is the same `TokenResponse`, so the client can
+continue without a second login call:
+
+```bash
+curl -s -X POST http://localhost:8080/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Ana","lastName":"Pérez","email":"ana@example.com","password":"secreto123"}'
+```
+
 | Resource | Public | Any authenticated role | `ADMIN` only |
 | --- | --- | --- | --- |
 | `POST /auth/login` | Yes | | |
+| `POST /auth/register` | Yes | | |
 | Swagger (`/swagger`, `/v3/api-docs`) | Yes | | |
 | `GET /categories`, `GET /products` | Yes | | |
 | Mutations of `/categories` and `/products` | | | Yes |
@@ -390,7 +406,7 @@ valid token without the required role returns `403`.
 | `/users/**` (including creating users) | | | Yes |
 | `GET /addresses` (global list) | | | Yes |
 | `GET /orders/me`, `GET /addresses/me` | | Own resources | |
-| `/orders`: create, get by id, by user, items, cancel | | Own resources | |
+| `/orders`: create, get by id, by user, items, pay, cancel | | Own resources | |
 | `/addresses`: get by id, by user, create, update, delete | | Own resources | |
 | `/orders`: global list, by status, `PATCH status`, `DELETE` | | | Yes |
 | `/order-items/**` | | | Yes |
@@ -406,15 +422,15 @@ Unknown email, wrong password and inactive user all return the same `401` with
 
 | Resource | Base path | Endpoints |
 | --- | --- | ---: |
-| Auth | `/auth` | 1 |
+| Auth | `/auth` | 2 |
 | Categories | `/categories` | 9 |
 | Products | `/products` | 10 |
 | Inventories | `/inventories` | 11 |
 | Users | `/users` | 8 |
 | Addresses | `/addresses` | 8 |
-| Orders | `/orders` | 12 |
+| Orders | `/orders` | 13 |
 | Order items | `/order-items` | 3 |
-| **Total** | | **62** |
+| **Total** | | **64** |
 
 ### Suggested order of use
 
@@ -549,24 +565,26 @@ A `401` uses the same shape:
 
 ## Tests
 
-The suite is split by module instead of living in a single file. There are 82 tests.
+The suite is split by module instead of living in a single file. There are 95 tests.
 
 | Type | Class | Tests | What it covers |
 | --- | --- | ---: | --- |
 | Context | `EcomerceApplicationTests` | 1 | The application context starts |
 | Slice | `CategoryControllerTest` | 6 | CRUD contract, validation, `409` on delete |
-| Slice | `ProductsControllerTest` | 7 | Search, category filter, create, deactivate, delete conflict |
+| Slice | `ProductsControllerTest` | 9 | Search, category filter, stock/availability, create, deactivate, delete conflict |
 | Slice | `InventoryControllerTest` | 7 | Create, validation, low stock, stock movements, delete |
 | Slice | `UsersControllerTest` | 6 | Create, email validation, lookup, deactivate, delete conflict |
 | Slice | `AddressesControllerTest` | 7 | Create, validation, own addresses, delete rules |
-| Slice | `OrdersControllerTest` | 8 | Create, invalid status, items, status change, cancel, delete |
+| Slice | `OrdersControllerTest` | 10 | Create, invalid status, items, status change, owner payment, cancel, delete |
 | Slice | `OrderItemControllerTest` | 3 | List by order, missing item, delete |
-| Slice | `AuthControllerTest` | 3 | Login response, email validation, bad credentials |
-| Integration | `CatalogIntegrationTest` | 4 | Unique category, product FK, low stock/overdraft, active search |
+| Slice | `AuthControllerTest` | 5 | Login response, public registration, validation, bad credentials |
+| Integration | `CatalogIntegrationTest` | 5 | Unique category, product FK, low stock/overdraft, active search, public stock |
 | Integration | `CustomerIntegrationTest` | 3 | Email normalization, duplicate email, address ownership |
 | Integration | `OrderLifecycleIntegrationTest` | 6 | Full purchase, totals, stock, invalid transitions, address ownership |
 | Integration | `SecurityIntegrationTest` | 7 | Public reads, `401`/`403` problem details, admin access, real login |
 | Integration | `OwnershipIntegrationTest` | 14 | `/me` endpoints, cross-user access to orders and addresses, `ADMIN` bypass |
+| Integration | `PaymentIntegrationTest` | 4 | Owner payment, stock deduction, cross-user `404`, insufficient stock |
+| Integration | `RegistrationIntegrationTest` | 2 | Public registration, forced `CUSTOMER` role, duplicate email |
 
 - **Slice tests** use `@WebMvcTest` + `@MockitoBean` with `addFilters = false`: they check the HTTP
   contract without a database or the security chain.
