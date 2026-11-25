@@ -37,9 +37,4 @@ build/
 .opencode
 
 ### Documentación local ###
-AGENTS.md
-PROJECT.md
-ENDPOINTS.md
-ESQUEMA.md
-TESTS.md
-LIMITACIONES.md
+projectContext/
