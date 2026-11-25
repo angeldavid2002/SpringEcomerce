@@ -99,6 +99,12 @@ public class OrdersController {
         return OrderResponse.from(orderService.updateStatus(orderId, request.status()));
     }
 
+    @PostMapping("/{orderId}/pay")
+    public OrderResponse pay(@PathVariable Long orderId) {
+        requireOwnedOrder(orderId);
+        return OrderResponse.from(orderService.pay(orderId));
+    }
+
     @PatchMapping("/{orderId}/cancel")
     public OrderResponse cancel(@PathVariable Long orderId) {
         requireOwnedOrder(orderId);

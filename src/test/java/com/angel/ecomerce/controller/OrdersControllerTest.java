@@ -17,6 +17,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 import static com.angel.ecomerce.support.TestFixtures.address;
@@ -141,6 +142,32 @@ class OrdersControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PAID"));
+    }
+
+    @Test
+    void payReturnsPaidOrder() throws Exception {
+        User user = user(1L, "ana@example.com");
+        Address address = address(1L, user);
+        Order pending = order(1L, user, address, OrderStatus.PENDING, "39.98");
+        Order paid = order(1L, user, address, OrderStatus.PAID, "39.98");
+        given(orderService.findById(1L)).willReturn(Optional.of(pending));
+        given(orderService.pay(1L)).willReturn(paid);
+
+        mockMvc.perform(post("/orders/1/pay"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PAID"));
+    }
+
+    @Test
+    void payAnotherUsersOrderReturns404() throws Exception {
+        User owner = user(2L, "luis@example.com");
+        Order pending = order(1L, owner, address(1L, owner), OrderStatus.PENDING, "39.98");
+        given(orderService.findById(1L)).willReturn(Optional.of(pending));
+        doThrow(new NoSuchElementException("El recurso solicitado no existe"))
+                .when(ownershipGuard).requireOwnerOrAdmin(2L);
+
+        mockMvc.perform(post("/orders/1/pay"))
+                .andExpect(status().isNotFound());
     }
 
     @Test

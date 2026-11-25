@@ -205,6 +205,12 @@ public class OrderService implements IOrder {
 
     @Override
     @Transactional
+    public Order pay(Long orderId) {
+        return updateStatus(orderId, OrderStatus.PAID);
+    }
+
+    @Override
+    @Transactional
     public Order cancel(Long orderId) {
         return updateStatus(orderId, OrderStatus.CANCELLED);
     }

@@ -25,6 +25,8 @@ public interface IOrder {
 
     Order updateStatus(Long orderId, OrderStatus status);
 
+    Order pay(Long orderId);
+
     Order cancel(Long orderId);
 
     void deleteById(Long id);
