@@ -4,6 +4,7 @@ import com.angel.ecomerce.dto.category.CategoryCreateRequest;
 import com.angel.ecomerce.dto.category.CategoryResponse;
 import com.angel.ecomerce.dto.category.CategoryUpdateRequest;
 import com.angel.ecomerce.entity.Category;
+import com.angel.ecomerce.security.OwnershipGuard;
 import com.angel.ecomerce.service.category.ICategory;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -17,28 +18,23 @@ import java.util.NoSuchElementException;
 @RequestMapping("/categories")
 public class CategoryController {
     private final ICategory categoryService;
+    private final OwnershipGuard ownership;
 
-    public CategoryController(ICategory categoryService) {
+    public CategoryController(ICategory categoryService, OwnershipGuard ownership) {
         this.categoryService = categoryService;
+        this.ownership = ownership;
     }
 
-    @GetMapping("/heartbeat")
-    public String heartbeat() {
-        return "alive";
-    }
-
+    /**
+     * Categorías de la tienda. Sin token o con un token {@code CUSTOMER} solo
+     * devuelve las activas; un {@code ADMIN} ve también las inactivas.
+     */
     @GetMapping
     public List<CategoryResponse> getAll() {
-        return categoryService.getAll().stream()
-                .map(CategoryResponse::from)
-                .toList();
-    }
-
-    @GetMapping("/active")
-    public List<CategoryResponse> getActive() {
-        return categoryService.getActive().stream()
-                .map(CategoryResponse::from)
-                .toList();
+        List<Category> categories = ownership.isAdmin()
+                ? categoryService.getAll()
+                : categoryService.getActive();
+        return categories.stream().map(CategoryResponse::from).toList();
     }
 
     @GetMapping("/{id}")
@@ -69,12 +65,6 @@ public class CategoryController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         categoryService.deleteById(id);
-        return ResponseEntity.noContent().build();
-    }
-
-    @DeleteMapping
-    public ResponseEntity<Void> deleteAll() {
-        categoryService.deleteAll();
         return ResponseEntity.noContent().build();
     }
 }

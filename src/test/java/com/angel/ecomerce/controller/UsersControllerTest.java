@@ -1,6 +1,7 @@
 package com.angel.ecomerce.controller;
 
 import com.angel.ecomerce.entity.User;
+import com.angel.ecomerce.security.OwnershipGuard;
 import com.angel.ecomerce.service.users.IUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +35,9 @@ class UsersControllerTest {
     @MockitoBean
     private IUser usersService;
 
+    @MockitoBean
+    private OwnershipGuard ownershipGuard;
+
     // --- Creación ---
 
     @Test
@@ -65,6 +69,17 @@ class UsersControllerTest {
     }
 
     // --- Consultas ---
+
+    @Test
+    void meReturnsAuthenticatedUser() throws Exception {
+        given(ownershipGuard.currentUserId()).willReturn(1L);
+        given(usersService.findById(1L)).willReturn(Optional.of(user(1L, "ana@example.com")));
+
+        mockMvc.perform(get("/users/me"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.email").value("ana@example.com"));
+    }
 
     @Test
     void getByEmailReturnsUser() throws Exception {

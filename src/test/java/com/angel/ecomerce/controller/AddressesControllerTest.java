@@ -89,25 +89,14 @@ class AddressesControllerTest {
     }
 
     @Test
-    void getByUserReturnsList() throws Exception {
+    void getByIdReturnsOwnedAddress() throws Exception {
         User user = user(1L, "ana@example.com");
-        given(addressService.getByUserId(1L))
-                .willReturn(List.of(address(10L, user)));
+        given(addressService.findById(10L)).willReturn(Optional.of(address(10L, user)));
 
-        mockMvc.perform(get("/addresses/user/1"))
+        mockMvc.perform(get("/addresses/10"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(10))
-                .andExpect(jsonPath("$[0].userId").value(1));
-    }
-
-    @Test
-    void getByIdAndUserReturns404WhenNotOwned() throws Exception {
-        given(addressService.findByIdAndUserId(99L, 1L)).willReturn(Optional.empty());
-
-        mockMvc.perform(get("/addresses/99/user/1"))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.detail")
-                        .value("No existe la dirección con id 99 para el usuario 1"));
+                .andExpect(jsonPath("$.id").value(10))
+                .andExpect(jsonPath("$.userId").value(1));
     }
 
     // --- Borrado ---

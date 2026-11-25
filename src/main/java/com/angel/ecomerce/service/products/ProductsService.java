@@ -82,6 +82,14 @@ public class ProductsService implements IProduct {
     }
 
     @Override
+    public List<Product> searchByName(String name) {
+        if (name == null || name.isBlank()) {
+            return List.of();
+        }
+        return productsRepository.findByNameContainingIgnoreCaseOrderByNameAsc(name.trim());
+    }
+
+    @Override
     public Optional<Product> findById(Long id) {
         if (id == null) {
             return Optional.empty();

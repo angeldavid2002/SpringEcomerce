@@ -20,11 +20,7 @@ public interface IInventory {
 
     Inventory decreaseStock(Long productId, int quantity);
 
-    boolean isLowStock(Long productId);
-
     List<Inventory> getLowStock();
 
     void deleteById(Long id);
-
-    void deleteByProductId(Long productId);
 }

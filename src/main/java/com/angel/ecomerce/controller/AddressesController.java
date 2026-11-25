@@ -40,26 +40,9 @@ public class AddressesController {
                 .toList();
     }
 
-    @GetMapping("/user/{userId}")
-    public List<AddressResponse> getByUser(@PathVariable Long userId) {
-        ownership.requireSelfOrAdmin(userId);
-        return addressService.getByUserId(userId).stream()
-                .map(AddressResponse::from)
-                .toList();
-    }
-
     @GetMapping("/{id}")
     public AddressResponse getById(@PathVariable Long id) {
         return AddressResponse.from(requireOwnedAddress(id));
-    }
-
-    @GetMapping("/{id}/user/{userId}")
-    public AddressResponse getByIdAndUser(@PathVariable Long id, @PathVariable Long userId) {
-        ownership.requireSelfOrAdmin(userId);
-        return addressService.findByIdAndUserId(id, userId)
-                .map(AddressResponse::from)
-                .orElseThrow(() -> new NoSuchElementException(
-                        "No existe la dirección con id " + id + " para el usuario " + userId));
     }
 
     @PostMapping

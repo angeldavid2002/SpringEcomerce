@@ -18,6 +18,8 @@ public interface IProduct {
 
     List<Product> searchActiveByName(String name);
 
+    List<Product> searchByName(String name);
+
     Optional<Product> findById(Long id);
 
     Product updateById(Long id, Product updatedProduct);

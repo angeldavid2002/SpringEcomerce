@@ -3,6 +3,7 @@ package com.angel.ecomerce.controller;
 import com.angel.ecomerce.dto.user.UserCreateRequest;
 import com.angel.ecomerce.dto.user.UserResponse;
 import com.angel.ecomerce.dto.user.UserUpdateRequest;
+import com.angel.ecomerce.security.OwnershipGuard;
 import com.angel.ecomerce.service.users.IUser;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -16,9 +17,11 @@ import java.util.NoSuchElementException;
 @RequestMapping("/users")
 public class UsersController {
     private final IUser usersService;
+    private final OwnershipGuard ownership;
 
-    public UsersController(IUser usersService) {
+    public UsersController(IUser usersService, OwnershipGuard ownership) {
         this.usersService = usersService;
+        this.ownership = ownership;
     }
 
     @GetMapping
@@ -26,6 +29,14 @@ public class UsersController {
         return usersService.getAll().stream()
                 .map(UserResponse::from)
                 .toList();
+    }
+
+    @GetMapping("/me")
+    public UserResponse getMe() {
+        Long userId = ownership.currentUserId();
+        return usersService.findById(userId)
+                .map(UserResponse::from)
+                .orElseThrow(() -> new NoSuchElementException("No existe el usuario autenticado"));
     }
 
     @GetMapping("/active")

@@ -3,6 +3,8 @@ package com.angel.ecomerce.controller;
 import com.angel.ecomerce.dto.product.ProductCreateRequest;
 import com.angel.ecomerce.dto.product.ProductResponse;
 import com.angel.ecomerce.dto.product.ProductUpdateRequest;
+import com.angel.ecomerce.entity.Product;
+import com.angel.ecomerce.security.OwnershipGuard;
 import com.angel.ecomerce.service.products.IProduct;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -16,23 +18,20 @@ import java.util.NoSuchElementException;
 @RequestMapping("/products")
 public class ProductsController {
     private final IProduct productsService;
+    private final OwnershipGuard ownership;
 
-    public ProductsController(IProduct productsService) {
+    public ProductsController(IProduct productsService, OwnershipGuard ownership) {
         this.productsService = productsService;
+        this.ownership = ownership;
     }
 
+    /**
+     * Catálogo de la tienda. Sin token o con un token {@code CUSTOMER} solo
+     * devuelve productos activos; un {@code ADMIN} ve también los inactivos.
+     */
     @GetMapping
     public List<ProductResponse> getAll() {
-        return productsService.getAll().stream()
-                .map(ProductResponse::from)
-                .toList();
-    }
-
-    @GetMapping("/active")
-    public List<ProductResponse> getActive() {
-        return productsService.getActive().stream()
-                .map(ProductResponse::from)
-                .toList();
+        return toResponses(isAdmin() ? productsService.getAll() : productsService.getActive());
     }
 
     @GetMapping("/{id}")
@@ -44,23 +43,16 @@ public class ProductsController {
 
     @GetMapping("/category/{categoryId}")
     public List<ProductResponse> getByCategory(@PathVariable Long categoryId) {
-        return productsService.getByCategory(categoryId).stream()
-                .map(ProductResponse::from)
-                .toList();
-    }
-
-    @GetMapping("/category/{categoryId}/active")
-    public List<ProductResponse> getActiveByCategory(@PathVariable Long categoryId) {
-        return productsService.getActiveByCategory(categoryId).stream()
-                .map(ProductResponse::from)
-                .toList();
+        return toResponses(isAdmin()
+                ? productsService.getByCategory(categoryId)
+                : productsService.getActiveByCategory(categoryId));
     }
 
     @GetMapping("/search")
     public List<ProductResponse> search(@RequestParam String name) {
-        return productsService.searchActiveByName(name).stream()
-                .map(ProductResponse::from)
-                .toList();
+        return toResponses(isAdmin()
+                ? productsService.searchByName(name)
+                : productsService.searchActiveByName(name));
     }
 
     @PostMapping
@@ -86,5 +78,13 @@ public class ProductsController {
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         productsService.deleteById(id);
         return ResponseEntity.noContent().build();
+    }
+
+    private boolean isAdmin() {
+        return ownership.isAdmin();
+    }
+
+    private List<ProductResponse> toResponses(List<Product> products) {
+        return products.stream().map(ProductResponse::from).toList();
     }
 }

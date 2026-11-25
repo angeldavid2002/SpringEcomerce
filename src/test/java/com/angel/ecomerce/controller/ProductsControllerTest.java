@@ -2,6 +2,7 @@ package com.angel.ecomerce.controller;
 
 import com.angel.ecomerce.entity.Category;
 import com.angel.ecomerce.entity.Product;
+import com.angel.ecomerce.security.OwnershipGuard;
 import com.angel.ecomerce.service.products.IProduct;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,7 +40,36 @@ class ProductsControllerTest {
     @MockitoBean
     private IProduct productsService;
 
+    @MockitoBean
+    private OwnershipGuard ownershipGuard;
+
     // --- Consultas ---
+
+    @Test
+    void getAllReturnsOnlyActiveProductsForPublic() throws Exception {
+        given(productsService.getActive()).willReturn(List.of(
+                product(1L, "Libro de Java", "19.99", category(1L, "Libros"))
+        ));
+
+        mockMvc.perform(get("/products"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(1));
+    }
+
+    @Test
+    void getAllReturnsEveryProductForAdmin() throws Exception {
+        given(ownershipGuard.isAdmin()).willReturn(true);
+        given(productsService.getAll()).willReturn(List.of(
+                product(1L, "Libro de Java", "19.99", category(1L, "Libros")),
+                product(2L, "Libro descatalogado", "9.99", category(1L, "Libros"), false)
+        ));
+
+        mockMvc.perform(get("/products"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[1].active").value(false));
+    }
 
     @Test
     void searchReturnsMappedActiveProducts() throws Exception {
@@ -57,12 +87,24 @@ class ProductsControllerTest {
     @Test
     void getByCategoryReturnsMappedProducts() throws Exception {
         Product product = product(1L, "Libro de Java", "19.99", category(1L, "Libros"));
-        given(productsService.getByCategory(1L)).willReturn(List.of(product));
+        given(productsService.getActiveByCategory(1L)).willReturn(List.of(product));
 
         mockMvc.perform(get("/products/category/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].categoryId").value(1))
                 .andExpect(jsonPath("$[0].categoryName").value("Libros"));
+    }
+
+    @Test
+    void adminSearchIncludesInactiveProducts() throws Exception {
+        given(ownershipGuard.isAdmin()).willReturn(true);
+        given(productsService.searchByName("libro")).willReturn(List.of(
+                product(2L, "Libro descatalogado", "9.99", category(1L, "Libros"), false)
+        ));
+
+        mockMvc.perform(get("/products/search").param("name", "libro"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].active").value(false));
     }
 
     @Test

@@ -12,8 +12,6 @@ public interface ICategory {
 
     List<Category> getActive();
 
-    void deleteAll();
-
     void deleteById(Long id);
 
     Optional<Category> findById(Long id);

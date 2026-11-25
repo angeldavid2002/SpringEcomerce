@@ -423,14 +423,13 @@ Unknown email, wrong password and inactive user all return the same `401` with
 | Resource | Base path | Endpoints |
 | --- | --- | ---: |
 | Auth | `/auth` | 2 |
-| Categories | `/categories` | 9 |
-| Products | `/products` | 10 |
-| Inventories | `/inventories` | 11 |
-| Users | `/users` | 8 |
-| Addresses | `/addresses` | 8 |
+| Categories | `/categories` | 6 |
+| Products | `/products` | 8 |
+| Inventories | `/inventories` | 9 |
+| Users | `/users` | 9 |
+| Addresses | `/addresses` | 6 |
 | Orders | `/orders` | 13 |
-| Order items | `/order-items` | 3 |
-| **Total** | | **64** |
+| **Total** | | **55** |
 
 ### Suggested order of use
 
@@ -506,19 +505,17 @@ curl -s -X PATCH "$BASE/orders/$ORDER_ID/status" \
 
 ### Endpoint highlights
 
-- `GET /categories/heartbeat` → plain text `alive`.
-- `GET /categories/by-name?name=...` and `GET /users/by-email?email=...` are case-insensitive and
-  trimmed; a missing resource returns `404`.
-- `GET /products/search?name=...` performs a case-insensitive partial search and only returns
-  active products.
-- `GET /products/category/{id}` returns an empty list when the category does not exist.
-- `GET /inventories/product/{id}/low-stock` returns a raw boolean, not an object.
-- `lowStock` is `true` when `stock <= minStock`.
-- `PATCH /inventories/product/{id}/increase|decrease?quantity=N` requires `N > 0`; a decrease larger
-  than the current stock returns `409`.
-- `DELETE /orders/{orderId}/items/{itemId}` returns `200` with the updated order, not `204`.
-- `PUT /orders/{orderId}/items/{itemId}` with `quantity: 0` removes the item.
-- There is no endpoint to change the user or address of an existing order.
+- `GET /categories` y `GET /products` son públicos y devuelven **solo activos**; con token `ADMIN` devuelven todos.
+- `GET /categories/by-name?name=...` y `GET /users/by-email?email=...` son case-insensitive; recurso inexistente → `404`.
+- `GET /products/search?name=...` búsqueda parcial case-insensitive; público = solo activos.
+- `GET /products/category/{id}` lista vacía si la categoría no existe.
+- `GET /inventories/low-stock` lista inventarios con `stock <= minStock`.
+- `lowStock` es `true` cuando `stock <= minStock`.
+- `PATCH /inventories/product/{id}/increase|decrease?quantity=N` requiere `N > 0`; decrease mayor al stock → `409`.
+- `DELETE /orders/{orderId}/items/{itemId}` devuelve `200` con el pedido actualizado, no `204`.
+- `PUT /orders/{orderId}/items/{itemId}` con `quantity: 0` elimina el item.
+- `GET /users/me` devuelve el perfil del usuario autenticado.
+- No hay endpoint para cambiar el usuario o la dirección de un pedido existente.
 
 ### Status codes
 
@@ -565,23 +562,22 @@ A `401` uses the same shape:
 
 ## Tests
 
-The suite is split by module instead of living in a single file. There are 95 tests.
+The suite is split by module instead of living in a single file. There are 98 tests.
 
 | Type | Class | Tests | What it covers |
 | --- | --- | ---: | --- |
 | Context | `EcomerceApplicationTests` | 1 | The application context starts |
-| Slice | `CategoryControllerTest` | 6 | CRUD contract, validation, `409` on delete |
-| Slice | `ProductsControllerTest` | 9 | Search, category filter, stock/availability, create, deactivate, delete conflict |
-| Slice | `InventoryControllerTest` | 7 | Create, validation, low stock, stock movements, delete |
-| Slice | `UsersControllerTest` | 6 | Create, email validation, lookup, deactivate, delete conflict |
-| Slice | `AddressesControllerTest` | 7 | Create, validation, own addresses, delete rules |
+| Slice | `CategoryControllerTest` | 5 | CRUD contract, validation, `409` on delete, admin vs public listing |
+| Slice | `ProductsControllerTest` | 10 | Search, category filter, stock/availability, create, deactivate, delete conflict, admin vs public listing |
+| Slice | `InventoryControllerTest` | 6 | Create, validation, low stock list, stock movements, delete |
+| Slice | `UsersControllerTest` | 7 | Create, email validation, lookup, `GET /me`, deactivate, delete conflict |
+| Slice | `AddressesControllerTest` | 6 | Create, validation, own addresses, delete rules |
 | Slice | `OrdersControllerTest` | 10 | Create, invalid status, items, status change, owner payment, cancel, delete |
-| Slice | `OrderItemControllerTest` | 3 | List by order, missing item, delete |
 | Slice | `AuthControllerTest` | 5 | Login response, public registration, validation, bad credentials |
-| Integration | `CatalogIntegrationTest` | 5 | Unique category, product FK, low stock/overdraft, active search, public stock |
-| Integration | `CustomerIntegrationTest` | 3 | Email normalization, duplicate email, address ownership |
+| Integration | `CatalogIntegrationTest` | 7 | Unique category, product FK, low stock/overdraft, active search, public stock, admin sees inactive |
+| Integration | `CustomerIntegrationTest` | 2 | Email normalization, duplicate email, address ownership |
 | Integration | `OrderLifecycleIntegrationTest` | 6 | Full purchase, totals, stock, invalid transitions, address ownership |
-| Integration | `SecurityIntegrationTest` | 7 | Public reads, `401`/`403` problem details, admin access, real login |
+| Integration | `SecurityIntegrationTest` | 9 | Public reads, `401`/`403` problem details, admin access, real login, `GET /users/me` |
 | Integration | `OwnershipIntegrationTest` | 14 | `/me` endpoints, cross-user access to orders and addresses, `ADMIN` bypass |
 | Integration | `PaymentIntegrationTest` | 4 | Owner payment, stock deduction, cross-user `404`, insufficient stock |
 | Integration | `RegistrationIntegrationTest` | 2 | Public registration, forced `CUSTOMER` role, duplicate email |
@@ -663,8 +659,6 @@ These are deliberate scope decisions for a portfolio project:
 - Stock is deducted at payment time, not reserved when items are added.
 - No order history endpoint beyond querying orders by user or status.
 - No endpoint to change the user or address of an existing order.
-- No endpoint to edit items from `/order-items`; use the `/orders` routes.
-- Categories have no dedicated deactivation endpoint; use `PUT` with `active: false`.
 - Deleting history is intentionally blocked, so test data must be cleaned in reverse order or with SQL.
 - Docker and CI are configured (multi-stage `Dockerfile`, `docker-compose.yml`, GitHub Actions with a
   PostgreSQL service and an image build), but the compose stack has not been started locally yet and

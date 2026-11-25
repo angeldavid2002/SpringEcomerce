@@ -25,6 +25,9 @@ public interface ProductsRepository extends JpaRepository<Product, Long> {
     @EntityGraph(attributePaths = {"category", "inventory"})
     List<Product> findByNameContainingIgnoreCaseAndActiveTrueOrderByNameAsc(String name);
 
+    @EntityGraph(attributePaths = {"category", "inventory"})
+    List<Product> findByNameContainingIgnoreCaseOrderByNameAsc(String name);
+
     @Override
     @EntityGraph(attributePaths = {"category", "inventory"})
     Optional<Product> findById(Long id);

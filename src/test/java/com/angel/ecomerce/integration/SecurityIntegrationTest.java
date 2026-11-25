@@ -63,6 +63,24 @@ class SecurityIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
+    void customerTokenReadsOwnProfile() throws Exception {
+        String email = "me-" + suffix() + "@example.com";
+        createUserWithRole(email, "CUSTOMER");
+
+        mockMvc.perform(get("/users/me")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor(email, "CUSTOMER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value(email))
+                .andExpect(jsonPath("$.role").value("CUSTOMER"));
+    }
+
+    @Test
+    void anonymousProfileRequestReturns401() throws Exception {
+        mockMvc.perform(get("/users/me"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void adminTokenReachesAdminEndpoints() throws Exception {
         mockMvc.perform(get("/users")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken()))

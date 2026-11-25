@@ -49,11 +49,6 @@ public class InventoryController {
                 .toList();
     }
 
-    @GetMapping("/product/{productId}/low-stock")
-    public boolean isLowStock(@PathVariable Long productId) {
-        return inventoryService.isLowStock(productId);
-    }
-
     @PostMapping
     public ResponseEntity<InventoryResponse> create(
             @RequestParam Long productId,
@@ -80,12 +75,6 @@ public class InventoryController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         inventoryService.deleteById(id);
-        return ResponseEntity.noContent().build();
-    }
-
-    @DeleteMapping("/product/{productId}")
-    public ResponseEntity<Void> deleteByProduct(@PathVariable Long productId) {
-        inventoryService.deleteByProductId(productId);
         return ResponseEntity.noContent().build();
     }
 }

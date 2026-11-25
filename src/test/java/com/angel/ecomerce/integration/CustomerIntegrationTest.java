@@ -50,15 +50,10 @@ class CustomerIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
-    void addressBelongsToUserAndIsProtectedWhenUsedByOrder() throws Exception {
+    void addressUsedByOrderCannotBeDeleted() throws Exception {
         String suffix = suffix();
         long ownerId = createUser("buyer-" + suffix);
-        long otherId = createUser("other-" + suffix);
         long addressId = createAddress(ownerId);
-
-        performAsAdmin(get("/addresses/{id}/user/{userId}", addressId, otherId))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.detail").isNotEmpty());
 
         createOrder(ownerId, addressId);
 

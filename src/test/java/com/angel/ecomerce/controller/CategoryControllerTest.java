@@ -1,6 +1,7 @@
 package com.angel.ecomerce.controller;
 
 import com.angel.ecomerce.entity.Category;
+import com.angel.ecomerce.security.OwnershipGuard;
 import com.angel.ecomerce.service.category.ICategory;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,7 +17,6 @@ import java.util.Optional;
 import static com.angel.ecomerce.support.TestFixtures.category;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -33,6 +33,9 @@ class CategoryControllerTest {
 
     @MockitoBean
     private ICategory categoryService;
+
+    @MockitoBean
+    private OwnershipGuard ownershipGuard;
 
     // --- Creación ---
 
@@ -66,8 +69,8 @@ class CategoryControllerTest {
     // --- Consultas ---
 
     @Test
-    void getAllReturnsMappedList() throws Exception {
-        given(categoryService.getAll()).willReturn(List.of(
+    void getAllReturnsOnlyActiveCategoriesForPublic() throws Exception {
+        given(categoryService.getActive()).willReturn(List.of(
                 category(1L, "Libros"),
                 category(2L, "Música")
         ));
@@ -76,6 +79,19 @@ class CategoryControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(1))
                 .andExpect(jsonPath("$[1].name").value("Música"));
+    }
+
+    @Test
+    void getAllReturnsEveryCategoryForAdmin() throws Exception {
+        given(ownershipGuard.isAdmin()).willReturn(true);
+        given(categoryService.getAll()).willReturn(List.of(
+                category(1L, "Libros"),
+                category(2L, "Música")
+        ));
+
+        mockMvc.perform(get("/categories"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
     }
 
     @Test
@@ -95,16 +111,5 @@ class CategoryControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(categoryService).deleteById(1L);
-    }
-
-    @Test
-    void deleteAllReturns409WhenProductsExist() throws Exception {
-        doThrow(new IllegalStateException("No se pueden eliminar las categorías mientras existan productos asociados"))
-                .when(categoryService).deleteAll();
-
-        mockMvc.perform(delete("/categories"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.detail")
-                        .value("No se pueden eliminar las categorías mientras existan productos asociados"));
     }
 }

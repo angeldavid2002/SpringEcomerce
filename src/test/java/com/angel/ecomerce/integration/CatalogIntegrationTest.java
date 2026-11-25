@@ -6,7 +6,7 @@ import org.springframework.http.MediaType;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -48,9 +48,9 @@ class CatalogIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.stock").value(2))
                 .andExpect(jsonPath("$.lowStock").value(true));
 
-        performAsAdmin(get("/inventories/product/{productId}/low-stock", productId))
+        performAsAdmin(get("/inventories/product/{productId}", productId))
                 .andExpect(status().isOk())
-                .andExpect(content().string("true"));
+                .andExpect(jsonPath("$.lowStock").value(true));
 
         performAsAdmin(patch("/inventories/product/{productId}/decrease", productId)
                         .param("quantity", "1"))
@@ -77,7 +77,7 @@ class CatalogIntegrationTest extends IntegrationTestSupport {
         long categoryId = createCategory(suffix);
         long productId = createProduct(categoryId, productName, "19.99");
 
-        performAsAdmin(get("/products/search").param("name", productName))
+        mockMvc.perform(get("/products/search").param("name", productName))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].id").value((int) productId));
@@ -86,9 +86,44 @@ class CatalogIntegrationTest extends IntegrationTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.active").value(false));
 
-        performAsAdmin(get("/products/search").param("name", productName))
+        mockMvc.perform(get("/products/search").param("name", productName))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void publicListingHidesInactiveCatalogButAdminSeesIt() throws Exception {
+        String suffix = suffix();
+        String categoryName = "Category " + suffix;
+        String productName = "Hidden " + suffix;
+        long categoryId = createCategoryNamed(categoryName);
+        long productId = createProduct(categoryId, productName, "19.99");
+
+        performAsAdmin(patch("/products/{id}/deactivate", productId))
+                .andExpect(status().isOk());
+        performAsAdmin(put("/categories/{id}", categoryId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"%s","active":false}
+                                """.formatted(categoryName)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active").value(false));
+
+        mockMvc.perform(get("/products/category/{categoryId}", categoryId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id == %d)]".formatted(productId)).isEmpty());
+
+        mockMvc.perform(get("/categories"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id == %d)]".formatted(categoryId)).isEmpty());
+
+        performAsAdmin(get("/products"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id == %d)]".formatted(productId)).isNotEmpty());
+
+        performAsAdmin(get("/categories"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id == %d)]".formatted(categoryId)).isNotEmpty());
     }
 
     @Test

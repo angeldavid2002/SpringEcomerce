@@ -71,14 +71,6 @@ public class AddressService implements IAddress {
     }
 
     @Override
-    public Optional<Address> findByIdAndUserId(Long id, Long userId) {
-        if (id == null || userId == null) {
-            return Optional.empty();
-        }
-        return addressesRepository.findByIdAndUserId(id, userId);
-    }
-
-    @Override
     @Transactional
     public Address updateById(Long id, Address updatedAddress) {
         if (id == null) {

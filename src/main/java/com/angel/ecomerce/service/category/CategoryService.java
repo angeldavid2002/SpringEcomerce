@@ -49,15 +49,6 @@ public class CategoryService implements ICategory {
 
     @Override
     @Transactional
-    public void deleteAll() {
-        if (productsRepository.count() > 0) {
-            throw new IllegalStateException("No se pueden eliminar las categorías mientras existan productos asociados");
-        }
-        categoriesRepository.deleteAll();
-    }
-
-    @Override
-    @Transactional
     public void deleteById(Long id) {
         if (id == null) {
             throw new IllegalArgumentException("El id de la categoría es obligatorio");

@@ -11,6 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.List;
 import java.util.Optional;
 
 import static com.angel.ecomerce.support.TestFixtures.category;
@@ -24,7 +25,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -83,12 +83,13 @@ class InventoryControllerTest {
     }
 
     @Test
-    void lowStockReturnsBoolean() throws Exception {
-        given(inventoryService.isLowStock(1L)).willReturn(true);
+    void lowStockListReturnsInventoriesAtOrBelowMinimum() throws Exception {
+        Product product = product(1L, "Libro de Java", "19.99", category(1L, "Libros"));
+        given(inventoryService.getLowStock()).willReturn(List.of(inventory(10L, product, 2, 2)));
 
-        mockMvc.perform(get("/inventories/product/1/low-stock"))
+        mockMvc.perform(get("/inventories/low-stock"))
                 .andExpect(status().isOk())
-                .andExpect(content().string("true"));
+                .andExpect(jsonPath("$[0].lowStock").value(true));
     }
 
     // --- Movimientos de stock ---

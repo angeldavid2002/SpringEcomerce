@@ -118,12 +118,6 @@ public class InventoryService implements IInventory {
     }
 
     @Override
-    public boolean isLowStock(Long productId) {
-        Inventory inventory = getByProductIdOrThrow(productId);
-        return inventory.getStock() <= inventory.getMinStock();
-    }
-
-    @Override
     public List<Inventory> getLowStock() {
         return inventoriesRepository.findLowStock();
     }
@@ -138,18 +132,6 @@ public class InventoryService implements IInventory {
             throw new NoSuchElementException("No existe un inventario con ese id");
         }
         inventoriesRepository.deleteById(id);
-    }
-
-    @Override
-    @Transactional
-    public void deleteByProductId(Long productId) {
-        if (productId == null) {
-            throw new IllegalArgumentException("El producto es obligatorio");
-        }
-
-        Inventory inventory = inventoriesRepository.findByProductId(productId)
-                .orElseThrow(() -> new NoSuchElementException("No existe un inventario para ese producto"));
-        inventoriesRepository.delete(inventory);
     }
 
     private Inventory getByProductIdOrThrow(Long productId) {
