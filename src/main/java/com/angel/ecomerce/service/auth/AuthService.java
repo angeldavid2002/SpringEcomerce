@@ -1,8 +1,10 @@
 package com.angel.ecomerce.service.auth;
 
 import com.angel.ecomerce.dto.auth.LoginRequest;
+import com.angel.ecomerce.dto.auth.RegisterRequest;
 import com.angel.ecomerce.dto.auth.TokenResponse;
 import com.angel.ecomerce.entity.User;
+import com.angel.ecomerce.entity.enums.Role;
 import com.angel.ecomerce.security.JwtProperties;
 import com.angel.ecomerce.service.users.IUser;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -50,6 +52,24 @@ public class AuthService implements IAuth {
             throw invalidCredentials();
         }
 
+        return issueToken(user);
+    }
+
+    @Override
+    @Transactional
+    public TokenResponse register(RegisterRequest request) {
+        User user = new User();
+        user.setName(request.name());
+        user.setLastName(request.lastName());
+        user.setEmail(request.email());
+        user.setPassword(request.password());
+        user.setRole(Role.CUSTOMER);
+
+        User saved = usersService.save(user);
+        return issueToken(saved);
+    }
+
+    private TokenResponse issueToken(User user) {
         Instant issuedAt = Instant.now();
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer(properties.issuer())

@@ -1,6 +1,7 @@
 package com.angel.ecomerce.controller;
 
 import com.angel.ecomerce.dto.auth.LoginRequest;
+import com.angel.ecomerce.dto.auth.RegisterRequest;
 import com.angel.ecomerce.dto.auth.TokenResponse;
 import com.angel.ecomerce.service.auth.IAuth;
 import org.junit.jupiter.api.Test;
@@ -67,5 +68,32 @@ class AuthControllerTest {
                                 """))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.detail").value("Credenciales inválidas"));
+    }
+
+    @Test
+    void registerReturns201WithToken() throws Exception {
+        given(authService.register(any(RegisterRequest.class)))
+                .willReturn(new TokenResponse("jwt-nuevo", "Bearer", 3600));
+
+        mockMvc.perform(post("/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"Ana","lastName":"Pérez","email":"ana@example.com","password":"secreto123"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.token").value("jwt-nuevo"))
+                .andExpect(jsonPath("$.type").value("Bearer"))
+                .andExpect(jsonPath("$.expiresIn").value(3600));
+    }
+
+    @Test
+    void registerWithInvalidEmailReturns400WithFieldError() throws Exception {
+        mockMvc.perform(post("/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"Ana","email":"no-es-un-email","password":"secreto123"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.email").exists());
     }
 }
