@@ -15,9 +15,9 @@ import java.io.IOException;
  * Filtro que rechaza (401) cualquier petición cuyo JWT esté en la lista negra
  * de tokens revocados (logout). Se ejecuta una sola vez por petición.
  *
- * <p>Nota: no se declara como {@code @Component} para evitar romper los slice
- * tests. Para activarlo en producción, regístralo en
- * {@link com.angel.ecomerce.config.SecurityConfig} con {@code addFilterAfter}.</p>
+ * <p>Se registra en {@link com.angel.ecomerce.config.SecurityConfig} justo
+ * después de la autenticación bearer, así que solo corre con token válido.
+ * No es un bean: si lo fuera, los slice tests de controller lo arrastrarían.</p>
  */
 public class JwtBlacklistFilter extends OncePerRequestFilter {
 

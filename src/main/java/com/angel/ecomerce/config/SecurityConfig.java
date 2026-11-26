@@ -1,5 +1,6 @@
 package com.angel.ecomerce.config;
 
+import com.angel.ecomerce.repository.TokenBlacklistRepository;
 import com.angel.ecomerce.security.JwtProperties;
 import com.angel.ecomerce.security.JwtBlacklistFilter;
 import com.angel.ecomerce.security.RestAccessDeniedHandler;
@@ -16,6 +17,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
@@ -103,7 +105,8 @@ public class SecurityConfig {
                                                    RestAuthenticationEntryPoint entryPoint,
                                                    RestAccessDeniedHandler accessDeniedHandler,
                                                    Converter<Jwt, AbstractAuthenticationToken> jwtAuthenticationConverter,
-                                                   CorsConfigurationSource corsConfigurationSource)
+                                                   CorsConfigurationSource corsConfigurationSource,
+                                                   TokenBlacklistRepository tokenBlacklistRepository)
             throws Exception {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
@@ -114,6 +117,14 @@ public class SecurityConfig {
                         .requestMatchers("/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/register").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/refresh").permitAll()
+                        // El logout recibe el token a revocar en el cuerpo: es
+                        // público para que también funcione con el token ya
+                        // caducado y sea idempotente.
+                        .requestMatchers(HttpMethod.POST, "/auth/logout").permitAll()
+                        // Recuperar la contraseña ocurre sin sesión: si no, nadie
+                        // que olvidó la contraseña podría usarla.
+                        .requestMatchers(HttpMethod.POST, "/auth/forgot-password", "/auth/reset-password")
+                        .permitAll()
                         .requestMatchers("/swagger", "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**")
                         .permitAll()
                         // Permite que el despacho de errores renderice el ProblemDetail real
@@ -138,6 +149,10 @@ public class SecurityConfig {
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter))
                         .authenticationEntryPoint(entryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
+                // Revocación efectiva: un token cerrado en logout se rechaza
+                // en cada petición, no solo al caducar.
+                .addFilterAfter(new JwtBlacklistFilter(tokenBlacklistRepository),
+                        BearerTokenAuthenticationFilter.class)
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(entryPoint)
                         .accessDeniedHandler(accessDeniedHandler));
