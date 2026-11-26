@@ -138,21 +138,44 @@ public class ProductsService implements IProduct {
 
     @Override
     public Page<Product> findByPriceBetween(BigDecimal minPrice, BigDecimal maxPrice, Pageable pageable) {
+        requirePriceRange(minPrice, maxPrice);
+        return productsRepository.findByPriceBetweenOrderByNameAsc(minPrice, maxPrice, pageable);
+    }
+
+    @Override
+    public Page<Product> findActiveByPriceBetween(
+            BigDecimal minPrice, BigDecimal maxPrice, Pageable pageable) {
+        requirePriceRange(minPrice, maxPrice);
+        return productsRepository
+                .findByActiveTrueAndPriceBetweenOrderByNameAsc(minPrice, maxPrice, pageable);
+    }
+
+    @Override
+    public Page<Product> findByRatingGreaterThanEqual(BigDecimal minRating, Pageable pageable) {
+        requireRating(minRating);
+        return productsRepository.findByRatingGreaterThanEqualOrderByNameAsc(minRating, pageable);
+    }
+
+    @Override
+    public Page<Product> findActiveByRatingGreaterThanEqual(BigDecimal minRating, Pageable pageable) {
+        requireRating(minRating);
+        return productsRepository
+                .findByActiveTrueAndRatingGreaterThanEqualOrderByNameAsc(minRating, pageable);
+    }
+
+    private void requirePriceRange(BigDecimal minPrice, BigDecimal maxPrice) {
         if (minPrice == null || maxPrice == null) {
             throw new IllegalArgumentException("minPrice y maxPrice son obligatorios");
         }
         if (minPrice.compareTo(maxPrice) > 0) {
             throw new IllegalArgumentException("minPrice no puede ser mayor que maxPrice");
         }
-        return productsRepository.findByPriceBetweenOrderByNameAsc(minPrice, maxPrice, pageable);
     }
 
-    @Override
-    public Page<Product> findByRatingGreaterThanEqual(BigDecimal minRating, Pageable pageable) {
+    private void requireRating(BigDecimal minRating) {
         if (minRating == null) {
             throw new IllegalArgumentException("minRating es obligatorio");
         }
-        return productsRepository.findByRatingGreaterThanEqualOrderByNameAsc(minRating, pageable);
     }
 
     @Override

@@ -55,7 +55,15 @@ public interface ProductsRepository extends JpaRepository<Product, Long> {
     Page<Product> findByPriceBetweenOrderByNameAsc(BigDecimal min, BigDecimal max, Pageable pageable);
 
     @EntityGraph(attributePaths = {"category", "inventory"})
+    Page<Product> findByActiveTrueAndPriceBetweenOrderByNameAsc(
+            BigDecimal min, BigDecimal max, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"category", "inventory"})
     Page<Product> findByRatingGreaterThanEqualOrderByNameAsc(BigDecimal minRating, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"category", "inventory"})
+    Page<Product> findByActiveTrueAndRatingGreaterThanEqualOrderByNameAsc(
+            BigDecimal minRating, Pageable pageable);
 
     @Override
     @EntityGraph(attributePaths = {"category", "inventory"})

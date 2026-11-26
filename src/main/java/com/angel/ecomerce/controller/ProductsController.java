@@ -53,12 +53,18 @@ public class ProductsController {
             if (maxPrice == null) {
                 maxPrice = new BigDecimal("999999999.99");
             }
-            return productsService.findByPriceBetween(minPrice, maxPrice, pageable)
+            // El público (y un CUSTOMER) solo ve activos; los filtros no
+            // deberían filtrar al revés que el listado general.
+            return (isAdmin
+                    ? productsService.findByPriceBetween(minPrice, maxPrice, pageable)
+                    : productsService.findActiveByPriceBetween(minPrice, maxPrice, pageable))
                     .map(ProductResponse::from);
         }
 
         if (minRating != null) {
-            return productsService.findByRatingGreaterThanEqual(minRating, pageable)
+            return (isAdmin
+                    ? productsService.findByRatingGreaterThanEqual(minRating, pageable)
+                    : productsService.findActiveByRatingGreaterThanEqual(minRating, pageable))
                     .map(ProductResponse::from);
         }
 

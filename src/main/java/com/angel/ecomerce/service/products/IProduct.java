@@ -37,7 +37,11 @@ public interface IProduct {
 
     Page<Product> findByPriceBetween(BigDecimal minPrice, BigDecimal maxPrice, Pageable pageable);
 
+    Page<Product> findActiveByPriceBetween(BigDecimal minPrice, BigDecimal maxPrice, Pageable pageable);
+
     Page<Product> findByRatingGreaterThanEqual(BigDecimal minRating, Pageable pageable);
+
+    Page<Product> findActiveByRatingGreaterThanEqual(BigDecimal minRating, Pageable pageable);
 
     Optional<Product> findById(Long id);
 
