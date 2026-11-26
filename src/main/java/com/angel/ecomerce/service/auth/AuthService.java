@@ -35,6 +35,9 @@ import java.util.UUID;
 @Transactional(readOnly = true)
 public class AuthService implements IAuth {
 
+    /** Vigencia del refresh token. El access token usa {@code app.jwt.expiration}. */
+    private static final Duration REFRESH_TOKEN_TTL = Duration.ofDays(7);
+
     private final IUser usersService;
     private final PasswordEncoder passwordEncoder;
     private final JwtEncoder jwtEncoder;
@@ -87,11 +90,8 @@ public class AuthService implements IAuth {
         String jti = extractJti(request.token());
         Instant expiresAt = extractExpiration(request.token());
 
-        if (jti != null && expiresAt != null && !blacklistRepository.findByJti(jti).isPresent()) {
-            TokenBlacklist entry = new TokenBlacklist();
-            entry.setJti(jti);
-            entry.setExpiresAt(LocalDateTime.ofInstant(expiresAt, ZoneId.systemDefault()));
-            blacklistRepository.save(entry);
+        if (jti != null && expiresAt != null && blacklistRepository.findByJti(jti).isEmpty()) {
+            blacklistRepository.save(blacklistEntry(jti, expiresAt));
         }
     }
 
@@ -113,12 +113,16 @@ public class AuthService implements IAuth {
             throw new BadCredentialsException("El token no es un refresh token");
         }
 
+        if (jti == null || jti.isBlank()) {
+            throw new BadCredentialsException("Refresh token sin identificador");
+        }
+
         if (blacklistRepository.findByJti(jti).isPresent()) {
             throw new BadCredentialsException("Refresh token revocado");
         }
 
         Instant now = Instant.now();
-        if (now.isAfter(expiresAt)) {
+        if (expiresAt == null || now.isAfter(expiresAt)) {
             throw new BadCredentialsException("Refresh token expirado");
         }
 
@@ -127,43 +131,27 @@ public class AuthService implements IAuth {
                 .filter(User::isActive)
                 .orElseThrow(() -> new BadCredentialsException("Usuario del token ya no existe"));
 
-        // Revocar el refresh token usado
-        TokenBlacklist entry = new TokenBlacklist();
-        entry.setJti(jti);
-        entry.setExpiresAt(LocalDateTime.ofInstant(expiresAt, ZoneId.systemDefault()));
-        blacklistRepository.save(entry);
+        // Rotación: el refresh token usado se revoca antes de emitir el nuevo par.
+        blacklistRepository.save(blacklistEntry(jti, expiresAt));
 
-        // Emitir nuevo par de tokens
-        Instant issuedAt = Instant.now();
-        JwtClaimsSet accessClaims = JwtClaimsSet.builder()
-                .issuer(properties.getIssuer())
-                .subject(user.getEmail())
-                .issuedAt(issuedAt)
-                .expiresAt(issuedAt.plus(properties.getExpiration()))
-                .claim("roles", List.of(user.getRole().name()))
-                .build();
-        JwsHeader header = JwsHeader.with(properties.getAlgorithm()).build();
-
-        String accessToken = jwtEncoder.encode(JwtEncoderParameters.from(header, accessClaims)).getTokenValue();
-
-        Instant refreshExpiresAt = issuedAt.plus(Duration.ofDays(7));
-        JwtClaimsSet refreshClaims = JwtClaimsSet.builder()
-                .issuer(properties.getIssuer())
-                .subject(user.getEmail())
-                .issuedAt(issuedAt)
-                .expiresAt(refreshExpiresAt)
-                .claim("roles", List.of(user.getRole().name()))
-                .claim("type", "refresh")
-                .build();
-        String newRefreshToken = jwtEncoder.encode(JwtEncoderParameters.from(header, refreshClaims)).getTokenValue();
-
-        return RefreshResponse.bearer(accessToken, newRefreshToken, properties.getExpiration().getSeconds());
+        TokenPair tokens = issueTokens(user, now);
+        return new RefreshResponse(tokens.accessToken(), tokens.refreshToken(), "Bearer",
+                properties.getExpiration().getSeconds());
     }
 
     private TokenResponse issueTokenPair(User user) {
-        Instant issuedAt = Instant.now();
+        TokenPair tokens = issueTokens(user, Instant.now());
+        return TokenResponse.bearerWithRefresh(tokens.accessToken(), tokens.refreshToken(),
+                properties.getExpiration().getSeconds());
+    }
 
-        // Access token con jti único para poder revocarlo en logout
+    /**
+     * Emite un par de tokens nuevos. Cada token lleva un {@code jti} único para
+     * poder revocarlo (logout) y para que la rotación funcione en cadena.
+     */
+    private TokenPair issueTokens(User user, Instant issuedAt) {
+        JwsHeader header = JwsHeader.with(properties.getAlgorithm()).build();
+
         String accessJti = UUID.randomUUID().toString();
         JwtClaimsSet accessClaims = JwtClaimsSet.builder()
                 .issuer(properties.getIssuer())
@@ -173,25 +161,31 @@ public class AuthService implements IAuth {
                 .claim("jti", accessJti)
                 .claim("roles", List.of(user.getRole().name()))
                 .build();
-        JwsHeader header = JwsHeader.with(properties.getAlgorithm()).build();
-
         String accessToken = jwtEncoder.encode(JwtEncoderParameters.from(header, accessClaims)).getTokenValue();
 
-        // Refresh token (más duradero, marcado como tipo refresh, con jti único)
         String refreshJti = UUID.randomUUID().toString();
-        Instant refreshExpiresAt = issuedAt.plus(Duration.ofDays(7));
         JwtClaimsSet refreshClaims = JwtClaimsSet.builder()
                 .issuer(properties.getIssuer())
                 .subject(user.getEmail())
                 .issuedAt(issuedAt)
-                .expiresAt(refreshExpiresAt)
+                .expiresAt(issuedAt.plus(REFRESH_TOKEN_TTL))
                 .claim("jti", refreshJti)
                 .claim("roles", List.of(user.getRole().name()))
                 .claim("type", "refresh")
                 .build();
         String refreshToken = jwtEncoder.encode(JwtEncoderParameters.from(header, refreshClaims)).getTokenValue();
 
-        return TokenResponse.bearerWithRefresh(accessToken, refreshToken, properties.getExpiration().getSeconds());
+        return new TokenPair(accessToken, refreshToken);
+    }
+
+    private TokenBlacklist blacklistEntry(String jti, Instant expiresAt) {
+        TokenBlacklist entry = new TokenBlacklist();
+        entry.setJti(jti);
+        entry.setExpiresAt(LocalDateTime.ofInstant(expiresAt, ZoneId.systemDefault()));
+        return entry;
+    }
+
+    private record TokenPair(String accessToken, String refreshToken) {
     }
 
     private BadCredentialsException invalidCredentials() {
