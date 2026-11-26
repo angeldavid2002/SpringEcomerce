@@ -127,10 +127,19 @@ public class UserService implements IUser {
 
         return usersRepository.findById(id)
                 .map(existingUser -> {
-                    String email = normalizeEmail(patch.email());
-                    validateEmail(email, id);
+                    // El email es opcional en un PATCH: si no llega se mantiene.
+                    String newEmail = patch.hasEmail() ? normalizeEmail(patch.email()) : null;
+                    if (newEmail != null) {
+                        validateEmail(newEmail, id);
+                    }
+                    boolean emailChanged = newEmail != null
+                            && !newEmail.equalsIgnoreCase(existingUser.getEmail());
 
                     patch.applyTo(existingUser);
+                    if (emailChanged) {
+                        // Un email nuevo deja de estar verificado.
+                        existingUser.setEmailVerified(false);
+                    }
                     return usersRepository.save(existingUser);
                 });
     }
