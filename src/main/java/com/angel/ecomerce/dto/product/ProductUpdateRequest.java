@@ -25,7 +25,8 @@ public record ProductUpdateRequest(
         @NotNull(message = "La categoría es obligatoria")
         Long categoryId,
         @NotNull(message = "El estado activo es obligatorio")
-        Boolean active
+        Boolean active,
+        BigDecimal rating
 ) {
     public Product toEntity() {
         Product product = new Product();
@@ -33,10 +34,11 @@ public record ProductUpdateRequest(
         product.setDescription(description);
         product.setPrice(price);
         product.setImageUrl(imageUrl);
+        product.setRating(rating == null ? BigDecimal.ZERO : rating);
+        product.setActive(active);
         Category category = new Category();
         category.setId(categoryId);
         product.setCategory(category);
-        product.setActive(active);
         return product;
     }
 }

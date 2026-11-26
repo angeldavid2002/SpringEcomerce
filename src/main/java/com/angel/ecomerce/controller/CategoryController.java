@@ -7,6 +7,9 @@ import com.angel.ecomerce.entity.Category;
 import com.angel.ecomerce.security.OwnershipGuard;
 import com.angel.ecomerce.service.category.ICategory;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -28,13 +31,22 @@ public class CategoryController {
     /**
      * Categorías de la tienda. Sin token o con un token {@code CUSTOMER} solo
      * devuelve las activas; un {@code ADMIN} ve también las inactivas.
+     * Soporta paginación (?page=&limit=).
      */
     @GetMapping
-    public List<CategoryResponse> getAll() {
+    public Page<CategoryResponse> getAll(
+            @RequestParam(required = false, defaultValue = "0") int page,
+            @RequestParam(required = false, defaultValue = "20") int limit) {
+
+        PageRequest pageable = PageRequest.of(page, limit, Sort.by("name").ascending());
         List<Category> categories = ownership.isAdmin()
                 ? categoryService.getAll()
                 : categoryService.getActive();
-        return categories.stream().map(CategoryResponse::from).toList();
+        int start = (int) Math.min((long) page * limit, categories.size());
+        int end = (int) Math.min((long) start + limit, categories.size());
+        List<Category> paged = categories.subList(start, end);
+        return new org.springframework.data.domain.PageImpl<>(paged, pageable, categories.size())
+                .map(CategoryResponse::from);
     }
 
     @GetMapping("/{id}")

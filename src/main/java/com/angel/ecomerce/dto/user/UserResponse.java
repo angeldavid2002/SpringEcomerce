@@ -12,6 +12,7 @@ public record UserResponse(
         String email,
         Role role,
         boolean active,
+        boolean emailVerified,
         LocalDateTime created,
         LocalDateTime updated
 ) {
@@ -23,6 +24,7 @@ public record UserResponse(
                 user.getEmail(),
                 user.getRole(),
                 user.isActive(),
+                user.isEmailVerified(),
                 user.getCreated(),
                 user.getUpdated()
         );

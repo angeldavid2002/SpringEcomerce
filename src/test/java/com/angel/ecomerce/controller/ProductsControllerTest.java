@@ -8,6 +8,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -47,64 +50,70 @@ class ProductsControllerTest {
 
     @Test
     void getAllReturnsOnlyActiveProductsForPublic() throws Exception {
-        given(productsService.getActive()).willReturn(List.of(
+        Page<Product> page = new PageImpl<>(List.of(
                 product(1L, "Libro de Java", "19.99", category(1L, "Libros"))
         ));
+        given(productsService.getActive(any(Pageable.class))).willReturn(page);
+        given(ownershipGuard.isAdmin()).willReturn(false);
 
         mockMvc.perform(get("/products"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].id").value(1));
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(1));
     }
 
     @Test
     void getAllReturnsEveryProductForAdmin() throws Exception {
-        given(ownershipGuard.isAdmin()).willReturn(true);
-        given(productsService.getAll()).willReturn(List.of(
+        Page<Product> page = new PageImpl<>(List.of(
                 product(1L, "Libro de Java", "19.99", category(1L, "Libros")),
                 product(2L, "Libro descatalogado", "9.99", category(1L, "Libros"), false)
         ));
+        given(ownershipGuard.isAdmin()).willReturn(true);
+        given(productsService.getAll(any(Pageable.class))).willReturn(page);
 
         mockMvc.perform(get("/products"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2))
-                .andExpect(jsonPath("$[1].active").value(false));
+                .andExpect(jsonPath("$.content.length()").value(2))
+                .andExpect(jsonPath("$.content[1].active").value(false));
     }
 
     @Test
     void searchReturnsMappedActiveProducts() throws Exception {
         Product product = product(1L, "Libro de Java", "19.99", category(1L, "Libros"));
-        given(productsService.searchActiveByName("libro")).willReturn(List.of(product));
+        Page<Product> page = new PageImpl<>(List.of(product));
+        given(productsService.searchActiveByName(any(String.class), any(Pageable.class))).willReturn(page);
 
         mockMvc.perform(get("/products/search").param("name", "libro"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(1))
-                .andExpect(jsonPath("$[0].name").value("Libro de Java"))
-                .andExpect(jsonPath("$[0].categoryName").value("Libros"))
-                .andExpect(jsonPath("$[0].active").value(true));
+                .andExpect(jsonPath("$.content[0].id").value(1))
+                .andExpect(jsonPath("$.content[0].name").value("Libro de Java"))
+                .andExpect(jsonPath("$.content[0].categoryName").value("Libros"))
+                .andExpect(jsonPath("$.content[0].active").value(true));
     }
 
     @Test
     void getByCategoryReturnsMappedProducts() throws Exception {
         Product product = product(1L, "Libro de Java", "19.99", category(1L, "Libros"));
-        given(productsService.getActiveByCategory(1L)).willReturn(List.of(product));
+        Page<Product> page = new PageImpl<>(List.of(product));
+        given(productsService.getActiveByCategory(any(Long.class), any(Pageable.class))).willReturn(page);
 
         mockMvc.perform(get("/products/category/1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].categoryId").value(1))
-                .andExpect(jsonPath("$[0].categoryName").value("Libros"));
+                .andExpect(jsonPath("$.content[0].categoryId").value(1))
+                .andExpect(jsonPath("$.content[0].categoryName").value("Libros"));
     }
 
     @Test
     void adminSearchIncludesInactiveProducts() throws Exception {
         given(ownershipGuard.isAdmin()).willReturn(true);
-        given(productsService.searchByName("libro")).willReturn(List.of(
+        Page<Product> page = new PageImpl<>(List.of(
                 product(2L, "Libro descatalogado", "9.99", category(1L, "Libros"), false)
         ));
+        given(productsService.searchByName(any(String.class), any(Pageable.class))).willReturn(page);
 
         mockMvc.perform(get("/products/search").param("name", "libro"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].active").value(false));
+                .andExpect(jsonPath("$.content[0].active").value(false));
     }
 
     @Test

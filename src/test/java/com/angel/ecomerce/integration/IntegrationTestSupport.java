@@ -70,13 +70,13 @@ abstract class IntegrationTestSupport {
     protected String tokenFor(String subject, String role) {
         Instant now = Instant.now();
         JwtClaimsSet claims = JwtClaimsSet.builder()
-                .issuer(jwtProperties.issuer())
+                .issuer(jwtProperties.getIssuer())
                 .subject(subject)
                 .issuedAt(now)
-                .expiresAt(now.plus(jwtProperties.expiration()))
+                .expiresAt(now.plus(jwtProperties.getExpiration()))
                 .claim("roles", List.of(role))
                 .build();
-        JwsHeader header = JwsHeader.with(jwtProperties.algorithm()).build();
+        JwsHeader header = JwsHeader.with(jwtProperties.getAlgorithm()).build();
         return jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
     }
 

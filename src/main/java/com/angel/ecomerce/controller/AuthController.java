@@ -1,6 +1,9 @@
 package com.angel.ecomerce.controller;
 
 import com.angel.ecomerce.dto.auth.LoginRequest;
+import com.angel.ecomerce.dto.auth.LogoutRequest;
+import com.angel.ecomerce.dto.auth.RefreshRequest;
+import com.angel.ecomerce.dto.auth.RefreshResponse;
 import com.angel.ecomerce.dto.auth.RegisterRequest;
 import com.angel.ecomerce.dto.auth.TokenResponse;
 import com.angel.ecomerce.service.auth.IAuth;
@@ -30,5 +33,16 @@ public class AuthController {
     public ResponseEntity<TokenResponse> register(@Valid @RequestBody RegisterRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(authService.register(request));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@Valid @RequestBody LogoutRequest request) {
+        authService.logout(request);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/refresh")
+    public RefreshResponse refresh(@Valid @RequestBody RefreshRequest request) {
+        return authService.refresh(request);
     }
 }

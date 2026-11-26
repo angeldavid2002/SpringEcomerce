@@ -203,7 +203,7 @@ class OwnershipIntegrationTest extends IntegrationTestSupport {
         mockMvc.perform(get("/addresses")
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2));
+                .andExpect(jsonPath("$.length()").value(4));
     }
 
     private Customer newCustomer(String prefix) throws Exception {

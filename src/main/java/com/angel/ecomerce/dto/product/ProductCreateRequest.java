@@ -23,7 +23,8 @@ public record ProductCreateRequest(
         @Size(max = 255, message = "La URL de la imagen no puede superar los 255 caracteres")
         String imageUrl,
         @NotNull(message = "La categoría es obligatoria")
-        Long categoryId
+        Long categoryId,
+        BigDecimal rating
 ) {
     public Product toEntity() {
         Product product = new Product();
@@ -31,6 +32,7 @@ public record ProductCreateRequest(
         product.setDescription(description);
         product.setPrice(price);
         product.setImageUrl(imageUrl);
+        product.setRating(rating == null ? BigDecimal.ZERO : rating);
         Category category = new Category();
         category.setId(categoryId);
         product.setCategory(category);

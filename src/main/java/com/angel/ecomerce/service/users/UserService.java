@@ -1,5 +1,6 @@
 package com.angel.ecomerce.service.users;
 
+import com.angel.ecomerce.dto.user.UserPatchRequest;
 import com.angel.ecomerce.entity.User;
 import com.angel.ecomerce.entity.enums.Role;
 import com.angel.ecomerce.repository.OrdersRepository;
@@ -112,6 +113,26 @@ public class UserService implements IUser {
                     return usersRepository.save(existingUser);
                 })
                 .orElseThrow(() -> new NoSuchElementException("No existe un usuario con ese id"));
+    }
+
+    @Override
+    @Transactional
+    public Optional<User> patchById(Long id, UserPatchRequest patch) {
+        if (id == null) {
+            throw new IllegalArgumentException("El id del usuario es obligatorio");
+        }
+        if (patch == null) {
+            throw new IllegalArgumentException("Los datos a actualizar son obligatorios");
+        }
+
+        return usersRepository.findById(id)
+                .map(existingUser -> {
+                    String email = normalizeEmail(patch.email());
+                    validateEmail(email, id);
+
+                    patch.applyTo(existingUser);
+                    return usersRepository.save(existingUser);
+                });
     }
 
     @Override

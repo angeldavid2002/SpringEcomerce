@@ -5,6 +5,8 @@ import com.angel.ecomerce.entity.Product;
 import com.angel.ecomerce.repository.CategoriesRepository;
 import com.angel.ecomerce.repository.OrderItemsRepository;
 import com.angel.ecomerce.repository.ProductsRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +45,9 @@ public class ProductsService implements IProduct {
         validate(product);
         product.setCategory(resolveCategory(product.getCategory()));
         product.setPrice(scalePrice(product.getPrice()));
+        if (product.getRating() == null) {
+            product.setRating(BigDecimal.ZERO);
+        }
         product.setActive(true);
         return productsRepository.save(product);
     }
@@ -90,6 +95,67 @@ public class ProductsService implements IProduct {
     }
 
     @Override
+    public Page<Product> getAll(Pageable pageable) {
+        return productsRepository.findAllBy(pageable);
+    }
+
+    @Override
+    public Page<Product> getActive(Pageable pageable) {
+        return productsRepository.findByActiveTrue(pageable);
+    }
+
+    @Override
+    public Page<Product> getByCategory(Long categoryId, Pageable pageable) {
+        if (categoryId == null) {
+            throw new IllegalArgumentException("La categoría es obligatoria");
+        }
+        return productsRepository.findByCategoryIdOrderByNameAsc(categoryId, pageable);
+    }
+
+    @Override
+    public Page<Product> getActiveByCategory(Long categoryId, Pageable pageable) {
+        if (categoryId == null) {
+            throw new IllegalArgumentException("La categoría es obligatoria");
+        }
+        return productsRepository.findByCategoryIdAndActiveTrueOrderByNameAsc(categoryId, pageable);
+    }
+
+    @Override
+    public Page<Product> searchByName(String name, Pageable pageable) {
+        if (name == null || name.isBlank()) {
+            return Page.empty(pageable);
+        }
+        return productsRepository.findByNameContainingIgnoreCaseOrderByNameAsc(name.trim(), pageable);
+    }
+
+    @Override
+    public Page<Product> searchActiveByName(String name, Pageable pageable) {
+        if (name == null || name.isBlank()) {
+            return Page.empty(pageable);
+        }
+        return productsRepository.findByNameContainingIgnoreCaseAndActiveTrueOrderByNameAsc(name.trim(), pageable);
+    }
+
+    @Override
+    public Page<Product> findByPriceBetween(BigDecimal minPrice, BigDecimal maxPrice, Pageable pageable) {
+        if (minPrice == null || maxPrice == null) {
+            throw new IllegalArgumentException("minPrice y maxPrice son obligatorios");
+        }
+        if (minPrice.compareTo(maxPrice) > 0) {
+            throw new IllegalArgumentException("minPrice no puede ser mayor que maxPrice");
+        }
+        return productsRepository.findByPriceBetweenOrderByNameAsc(minPrice, maxPrice, pageable);
+    }
+
+    @Override
+    public Page<Product> findByRatingGreaterThanEqual(BigDecimal minRating, Pageable pageable) {
+        if (minRating == null) {
+            throw new IllegalArgumentException("minRating es obligatorio");
+        }
+        return productsRepository.findByRatingGreaterThanEqualOrderByNameAsc(minRating, pageable);
+    }
+
+    @Override
     public Optional<Product> findById(Long id) {
         if (id == null) {
             return Optional.empty();
@@ -119,6 +185,9 @@ public class ProductsService implements IProduct {
                     existingProduct.setImageUrl(updatedProduct.getImageUrl());
                     existingProduct.setActive(updatedProduct.isActive());
                     existingProduct.setCategory(category);
+                    if (updatedProduct.getRating() != null) {
+                        existingProduct.setRating(updatedProduct.getRating());
+                    }
                     return productsRepository.save(existingProduct);
                 })
                 .orElseThrow(() -> new NoSuchElementException("No existe un producto con ese id"));
@@ -173,6 +242,10 @@ public class ProductsService implements IProduct {
         BigDecimal price = product.getPrice();
         if (price == null || price.compareTo(BigDecimal.ZERO) < 0) {
             throw new IllegalArgumentException("El precio del producto debe ser mayor o igual a cero");
+        }
+        BigDecimal rating = product.getRating();
+        if (rating != null && (rating.compareTo(BigDecimal.ZERO) < 0 || rating.compareTo(new BigDecimal("5.00")) > 0)) {
+            throw new IllegalArgumentException("El rating debe estar entre 0.00 y 5.00");
         }
     }
 

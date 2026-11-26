@@ -36,6 +36,9 @@ public class Product {
     @Column(nullable = false)
     private boolean active = true;
 
+    @Column(nullable = false, precision = 3, scale = 2)
+    private java.math.BigDecimal rating = java.math.BigDecimal.ZERO;
+
     @OneToOne(mappedBy = "product", fetch = FetchType.LAZY)
     private Inventory inventory;
 

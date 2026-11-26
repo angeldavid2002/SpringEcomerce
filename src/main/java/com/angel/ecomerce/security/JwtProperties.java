@@ -1,5 +1,6 @@
 package com.angel.ecomerce.security;
 
+import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 
@@ -14,9 +15,16 @@ import java.time.Duration;
  * aplicación no arranca y el mensaje lo explica.</p>
  */
 @ConfigurationProperties(prefix = "app.jwt")
-public record JwtProperties(String secret, String issuer, Duration expiration, MacAlgorithm algorithm) {
+@Data
+public class JwtProperties {
 
-    public JwtProperties {
+    private String secret;
+    private String issuer;
+    private Duration expiration;
+    private MacAlgorithm algorithm;
+
+    @jakarta.annotation.PostConstruct
+    public void validate() {
         if (algorithm == null) {
             algorithm = MacAlgorithm.HS256;
         }

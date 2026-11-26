@@ -79,8 +79,8 @@ class CatalogIntegrationTest extends IntegrationTestSupport {
 
         mockMvc.perform(get("/products/search").param("name", productName))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].id").value((int) productId));
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].id").value((int) productId));
 
         performAsAdmin(patch("/products/{id}/deactivate", productId))
                 .andExpect(status().isOk())
@@ -88,7 +88,7 @@ class CatalogIntegrationTest extends IntegrationTestSupport {
 
         mockMvc.perform(get("/products/search").param("name", productName))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
+                .andExpect(jsonPath("$.content.length()").value(0));
     }
 
     @Test
@@ -111,19 +111,19 @@ class CatalogIntegrationTest extends IntegrationTestSupport {
 
         mockMvc.perform(get("/products/category/{categoryId}", categoryId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.id == %d)]".formatted(productId)).isEmpty());
+                .andExpect(jsonPath("$.content[?(@.id == %d)]".formatted(productId)).isEmpty());
 
         mockMvc.perform(get("/categories"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.id == %d)]".formatted(categoryId)).isEmpty());
+                .andExpect(jsonPath("$.content[?(@.id == %d)]".formatted(categoryId)).isEmpty());
 
         performAsAdmin(get("/products"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.id == %d)]".formatted(productId)).isNotEmpty());
+                .andExpect(jsonPath("$.content[?(@.id == %d)]".formatted(productId)).isNotEmpty());
 
         performAsAdmin(get("/categories"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.id == %d)]".formatted(categoryId)).isNotEmpty());
+                .andExpect(jsonPath("$.content[?(@.id == %d)]".formatted(categoryId)).isNotEmpty());
     }
 
     @Test

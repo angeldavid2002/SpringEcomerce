@@ -1,6 +1,7 @@
 package com.angel.ecomerce.controller;
 
 import com.angel.ecomerce.dto.user.UserCreateRequest;
+import com.angel.ecomerce.dto.user.UserPatchRequest;
 import com.angel.ecomerce.dto.user.UserResponse;
 import com.angel.ecomerce.dto.user.UserUpdateRequest;
 import com.angel.ecomerce.security.OwnershipGuard;
@@ -37,6 +38,15 @@ public class UsersController {
         return usersService.findById(userId)
                 .map(UserResponse::from)
                 .orElseThrow(() -> new NoSuchElementException("No existe el usuario autenticado"));
+    }
+
+    @PatchMapping("/me")
+    public UserResponse patchMe(@Valid @RequestBody UserPatchRequest request) {
+        Long userId = ownership.currentUserId();
+        UserResponse updated = usersService.patchById(userId, request)
+                .map(UserResponse::from)
+                .orElseThrow(() -> new NoSuchElementException("No existe el usuario autenticado"));
+        return updated;
     }
 
     @GetMapping("/active")

@@ -7,10 +7,14 @@ import com.angel.ecomerce.entity.Product;
 import com.angel.ecomerce.security.OwnershipGuard;
 import com.angel.ecomerce.service.products.IProduct;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.NoSuchElementException;
 
@@ -28,10 +32,40 @@ public class ProductsController {
     /**
      * Catálogo de la tienda. Sin token o con un token {@code CUSTOMER} solo
      * devuelve productos activos; un {@code ADMIN} ve también los inactivos.
+     * Soporta paginación (?page=&limit=) y filtros de precio y rating.
      */
     @GetMapping
-    public List<ProductResponse> getAll() {
-        return toResponses(isAdmin() ? productsService.getAll() : productsService.getActive());
+    public Page<ProductResponse> getAll(
+            @RequestParam(required = false, defaultValue = "0") int page,
+            @RequestParam(required = false, defaultValue = "20") int limit,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) BigDecimal minRating) {
+
+        PageRequest pageable = PageRequest.of(page, limit, Sort.by("name").ascending());
+
+        boolean isAdmin = ownership.isAdmin();
+
+        if (minPrice != null || maxPrice != null) {
+            if (minPrice == null) {
+                minPrice = BigDecimal.ZERO;
+            }
+            if (maxPrice == null) {
+                maxPrice = new BigDecimal("999999999.99");
+            }
+            return productsService.findByPriceBetween(minPrice, maxPrice, pageable)
+                    .map(ProductResponse::from);
+        }
+
+        if (minRating != null) {
+            return productsService.findByRatingGreaterThanEqual(minRating, pageable)
+                    .map(ProductResponse::from);
+        }
+
+        if (isAdmin) {
+            return productsService.getAll(pageable).map(ProductResponse::from);
+        }
+        return productsService.getActive(pageable).map(ProductResponse::from);
     }
 
     @GetMapping("/{id}")
@@ -42,17 +76,33 @@ public class ProductsController {
     }
 
     @GetMapping("/category/{categoryId}")
-    public List<ProductResponse> getByCategory(@PathVariable Long categoryId) {
-        return toResponses(isAdmin()
-                ? productsService.getByCategory(categoryId)
-                : productsService.getActiveByCategory(categoryId));
+    public Page<ProductResponse> getByCategory(
+            @PathVariable Long categoryId,
+            @RequestParam(required = false, defaultValue = "0") int page,
+            @RequestParam(required = false, defaultValue = "20") int limit) {
+
+        PageRequest pageable = PageRequest.of(page, limit, Sort.by("name").ascending());
+        boolean isAdmin = ownership.isAdmin();
+
+        if (isAdmin) {
+            return productsService.getByCategory(categoryId, pageable).map(ProductResponse::from);
+        }
+        return productsService.getActiveByCategory(categoryId, pageable).map(ProductResponse::from);
     }
 
     @GetMapping("/search")
-    public List<ProductResponse> search(@RequestParam String name) {
-        return toResponses(isAdmin()
-                ? productsService.searchByName(name)
-                : productsService.searchActiveByName(name));
+    public Page<ProductResponse> search(
+            @RequestParam String name,
+            @RequestParam(required = false, defaultValue = "0") int page,
+            @RequestParam(required = false, defaultValue = "20") int limit) {
+
+        PageRequest pageable = PageRequest.of(page, limit, Sort.by("name").ascending());
+        boolean isAdmin = ownership.isAdmin();
+
+        if (isAdmin) {
+            return productsService.searchByName(name, pageable).map(ProductResponse::from);
+        }
+        return productsService.searchActiveByName(name, pageable).map(ProductResponse::from);
     }
 
     @PostMapping

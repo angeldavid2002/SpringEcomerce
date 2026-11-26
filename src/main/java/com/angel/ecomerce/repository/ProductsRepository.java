@@ -1,13 +1,18 @@
 package com.angel.ecomerce.repository;
 
 import com.angel.ecomerce.entity.Product;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
 public interface ProductsRepository extends JpaRepository<Product, Long> {
+
     boolean existsByCategoryId(Long categoryId);
 
     @EntityGraph(attributePaths = {"category", "inventory"})
@@ -27,6 +32,30 @@ public interface ProductsRepository extends JpaRepository<Product, Long> {
 
     @EntityGraph(attributePaths = {"category", "inventory"})
     List<Product> findByNameContainingIgnoreCaseOrderByNameAsc(String name);
+
+    @EntityGraph(attributePaths = {"category", "inventory"})
+    Page<Product> findAllBy(Pageable pageable);
+
+    @EntityGraph(attributePaths = {"category", "inventory"})
+    Page<Product> findByActiveTrue(Pageable pageable);
+
+    @EntityGraph(attributePaths = {"category", "inventory"})
+    Page<Product> findByCategoryIdOrderByNameAsc(Long categoryId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"category", "inventory"})
+    Page<Product> findByCategoryIdAndActiveTrueOrderByNameAsc(Long categoryId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"category", "inventory"})
+    Page<Product> findByNameContainingIgnoreCaseOrderByNameAsc(String name, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"category", "inventory"})
+    Page<Product> findByNameContainingIgnoreCaseAndActiveTrueOrderByNameAsc(String name, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"category", "inventory"})
+    Page<Product> findByPriceBetweenOrderByNameAsc(BigDecimal min, BigDecimal max, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"category", "inventory"})
+    Page<Product> findByRatingGreaterThanEqualOrderByNameAsc(BigDecimal minRating, Pageable pageable);
 
     @Override
     @EntityGraph(attributePaths = {"category", "inventory"})

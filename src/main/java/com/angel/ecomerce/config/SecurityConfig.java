@@ -1,6 +1,7 @@
 package com.angel.ecomerce.config;
 
 import com.angel.ecomerce.security.JwtProperties;
+import com.angel.ecomerce.security.JwtBlacklistFilter;
 import com.angel.ecomerce.security.RestAccessDeniedHandler;
 import com.angel.ecomerce.security.RestAuthenticationEntryPoint;
 import org.springframework.beans.factory.annotation.Value;
@@ -53,14 +54,14 @@ public class SecurityConfig {
     @Bean
     public JwtEncoder jwtEncoder(JwtProperties properties) {
         return NimbusJwtEncoder.withSecretKey(secretKey(properties))
-                .algorithm(properties.algorithm())
+                .algorithm(properties.getAlgorithm())
                 .build();
     }
 
     @Bean
     public JwtDecoder jwtDecoder(JwtProperties properties) {
         return NimbusJwtDecoder.withSecretKey(secretKey(properties))
-                .macAlgorithm(properties.algorithm())
+                .macAlgorithm(properties.getAlgorithm())
                 .build();
     }
 
@@ -108,15 +109,21 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/register").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/refresh").permitAll()
                         .requestMatchers("/swagger", "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**")
                         .permitAll()
                         .requestMatchers(HttpMethod.GET, "/categories", "/categories/**", "/products", "/products/**")
                         .permitAll()
                         .requestMatchers("/categories", "/categories/**", "/products", "/products/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/users/me").authenticated()
+                        .requestMatchers(HttpMethod.PATCH, "/users/me").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/cart").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/cart").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/cart").authenticated()
                         .requestMatchers("/inventories/**", "/users/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/addresses").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/orders", "/orders/status/**").hasRole("ADMIN")
@@ -134,7 +141,7 @@ public class SecurityConfig {
     }
 
     private SecretKey secretKey(JwtProperties properties) {
-        String jcaName = switch (properties.algorithm()) {
+        String jcaName = switch (properties.getAlgorithm()) {
             case HS256 -> "HmacSHA256";
             case HS384 -> "HmacSHA384";
             case HS512 -> "HmacSHA512";
