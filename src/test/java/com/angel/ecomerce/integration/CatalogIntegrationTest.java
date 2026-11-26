@@ -127,6 +127,48 @@ class CatalogIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
+    void publicPriceAndRatingFiltersHideInactiveProducts() throws Exception {
+        String suffix = suffix();
+        long categoryId = createCategoryNamed("PriceFilter " + suffix);
+        long inactiveId = createProduct(categoryId, "Inactive " + suffix, "15.00");
+
+        performAsAdmin(patch("/products/{id}/deactivate", inactiveId))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/products").param("minPrice", "10").param("maxPrice", "40"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[?(@.id == %d)]".formatted(inactiveId)).isEmpty());
+
+        mockMvc.perform(get("/products").param("minRating", "0"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[?(@.id == %d)]".formatted(inactiveId)).isEmpty());
+
+        // El admin, que ve también los inactivos, sí los obtiene.
+        performAsAdmin(get("/products").param("minPrice", "10").param("maxPrice", "40"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[?(@.id == %d)]".formatted(inactiveId)).isNotEmpty());
+
+        performAsAdmin(get("/products").param("minRating", "0"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[?(@.id == %d)]".formatted(inactiveId)).isNotEmpty());
+    }
+
+    @Test
+    void priceFiltersStillReturnActiveProductsInRange() throws Exception {
+        String suffix = suffix();
+        long categoryId = createCategoryNamed("Range " + suffix);
+        long productId = createProduct(categoryId, "Range " + suffix, "20.00");
+
+        mockMvc.perform(get("/products").param("minPrice", "10").param("maxPrice", "40"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[?(@.id == %d)]".formatted(productId)).isNotEmpty());
+
+        mockMvc.perform(get("/products").param("minPrice", "40").param("maxPrice", "10"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("minPrice no puede ser mayor que maxPrice"));
+    }
+
+    @Test
     void publicCatalogExposesStockWithoutAuthentication() throws Exception {
         long categoryId = createCategory(suffix());
         long productId = createProduct(categoryId, "Visible " + suffix(), "19.99");
