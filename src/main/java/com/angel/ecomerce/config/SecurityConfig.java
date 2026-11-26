@@ -116,6 +116,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/auth/refresh").permitAll()
                         .requestMatchers("/swagger", "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**")
                         .permitAll()
+                        // Permite que el despacho de errores renderice el ProblemDetail real
+                        // (sin esto, un 500 se convierte en un 401 engañoso).
+                        .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.GET, "/categories", "/categories/**", "/products", "/products/**")
                         .permitAll()
                         .requestMatchers("/categories", "/categories/**", "/products", "/products/**").hasRole("ADMIN")
@@ -123,7 +126,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PATCH, "/users/me").authenticated()
                         .requestMatchers(HttpMethod.GET, "/cart").authenticated()
                         .requestMatchers(HttpMethod.POST, "/cart").authenticated()
-                        .requestMatchers(HttpMethod.DELETE, "/cart").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/cart").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/cart", "/cart/**").authenticated()
                         .requestMatchers("/inventories/**", "/users/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/addresses").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/orders", "/orders/status/**").hasRole("ADMIN")
