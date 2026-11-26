@@ -197,13 +197,16 @@ class OwnershipIntegrationTest extends IntegrationTestSupport {
     void adminCanListEveryAddress() throws Exception {
         Customer ana = newCustomer("ana");
         Customer luis = newCustomer("luis");
-        createAddress(ana.id());
-        createAddress(luis.id());
+        long anaAddress = createAddress(ana.id());
+        long luisAddress = createAddress(luis.id());
 
+        // No se compara el total: la base puede tener direcciones de otras pruebas
+        // o de datos demo. Se verifica que el admin ve las direcciones creadas.
         mockMvc.perform(get("/addresses")
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(4));
+                .andExpect(jsonPath("$[?(@.id == %d)]".formatted(anaAddress)).isNotEmpty())
+                .andExpect(jsonPath("$[?(@.id == %d)]".formatted(luisAddress)).isNotEmpty());
     }
 
     private Customer newCustomer(String prefix) throws Exception {
