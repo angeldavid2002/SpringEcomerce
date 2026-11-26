@@ -1,6 +1,7 @@
 package com.angel.ecomerce.dto.cart;
 
 import com.angel.ecomerce.entity.Cart;
+import com.angel.ecomerce.entity.CartItem;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -17,10 +18,10 @@ public record CartResponse(
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
-    public static CartResponse from(Cart cart) {
-        List<CartItemResponse> itemResponses = cart.getItems() == null
+    public static CartResponse from(Cart cart, List<CartItem> cartItems) {
+        List<CartItemResponse> itemResponses = cartItems == null
                 ? List.of()
-                : cart.getItems().stream().map(CartItemResponse::from).toList();
+                : cartItems.stream().map(CartItemResponse::from).toList();
         BigDecimal total = itemResponses.stream()
                 .map(CartItemResponse::subtotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);

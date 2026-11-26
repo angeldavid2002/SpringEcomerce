@@ -3,15 +3,11 @@ package com.angel.ecomerce.controller;
 import com.angel.ecomerce.dto.cart.CartItemRequest;
 import com.angel.ecomerce.dto.cart.CartItemResponse;
 import com.angel.ecomerce.dto.cart.CartResponse;
-import com.angel.ecomerce.entity.Cart;
-import com.angel.ecomerce.entity.CartItem;
 import com.angel.ecomerce.security.OwnershipGuard;
 import com.angel.ecomerce.service.cart.CartService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-import java.util.NoSuchElementException;
 
 @RestController
 @RequestMapping("/cart")
@@ -29,9 +25,7 @@ public class CartController {
      */
     @GetMapping
     public CartResponse getCart() {
-        Long userId = ownership.currentUserId();
-        Cart cart = cartService.getOrCreateCart(userId);
-        return CartResponse.from(cart);
+        return cartService.getCart(ownership.currentUserId());
     }
 
     /**
@@ -39,10 +33,8 @@ public class CartController {
      * Cuerpo: { "productId": 1, "quantity": 2 }
      */
     @PostMapping
-    public CartItemResponse addItem(@RequestBody CartItemRequest request) {
-        Long userId = ownership.currentUserId();
-        CartItem item = cartService.addItem(userId, request.productId(), request.quantity());
-        return CartItemResponse.from(item);
+    public CartItemResponse addItem(@Valid @RequestBody CartItemRequest request) {
+        return cartService.addItem(ownership.currentUserId(), request.productId(), request.quantity());
     }
 
     /**
@@ -50,20 +42,16 @@ public class CartController {
      * Cuerpo: { "productId": 1, "quantity": 3 }
      */
     @PutMapping
-    public CartItemResponse updateItem(@RequestBody CartItemRequest request) {
-        Long userId = ownership.currentUserId();
-        CartItem item = cartService.updateItem(userId, request.productId(), request.quantity());
-        return CartItemResponse.from(item);
+    public CartItemResponse updateItem(@Valid @RequestBody CartItemRequest request) {
+        return cartService.updateItem(ownership.currentUserId(), request.productId(), request.quantity());
     }
 
     /**
-     * Quita un producto del carrito.
-     * Parámetro query: ?productId=1
+     * Quita un producto del carrito. Es idempotente: si no estaba, responde 204.
      */
     @DeleteMapping("/{productId}")
     public ResponseEntity<Void> removeItem(@PathVariable Long productId) {
-        Long userId = ownership.currentUserId();
-        cartService.removeItem(userId, productId);
+        cartService.removeItem(ownership.currentUserId(), productId);
         return ResponseEntity.noContent().build();
     }
 
@@ -72,8 +60,7 @@ public class CartController {
      */
     @DeleteMapping
     public ResponseEntity<Void> clearCart() {
-        Long userId = ownership.currentUserId();
-        cartService.clear(userId);
+        cartService.clear(ownership.currentUserId());
         return ResponseEntity.noContent().build();
     }
 }

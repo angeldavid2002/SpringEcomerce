@@ -1,5 +1,7 @@
 package com.angel.ecomerce.service.cart;
 
+import com.angel.ecomerce.dto.cart.CartItemResponse;
+import com.angel.ecomerce.dto.cart.CartResponse;
 import com.angel.ecomerce.entity.Cart;
 import com.angel.ecomerce.entity.CartItem;
 import com.angel.ecomerce.entity.Product;
@@ -11,7 +13,6 @@ import com.angel.ecomerce.repository.UsersRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.NoSuchElementException;
 
 /**
@@ -19,6 +20,10 @@ import java.util.NoSuchElementException;
  *
  * <p>Cada cliente tiene un único carrito. Las operaciones son:
  * obtener, añadir/actualizar línea, quitar línea y vaciar.</p>
+ *
+ * <p>Los métodos devuelven DTOs ya montados: la conversión ocurre dentro de la
+ * transacción, así que las relaciones perezosas ({@code product}) se cargan
+ * antes de cerrar la sesión y el controlador no recibe entidades.</p>
  */
 @Service
 @Transactional(readOnly = true)
@@ -40,24 +45,12 @@ public class CartService {
     }
 
     @Transactional
-    public Cart getOrCreateCart(Long userId) {
-        return cartsRepository.findByUserId(userId)
-                .map(cart -> {
-                    // Forzar carga de items
-                    cart.getItems().size();
-                    return cart;
-                })
-                .orElseGet(() -> {
-                    User user = usersRepository.findById(userId)
-                            .orElseThrow(() -> new NoSuchElementException("No existe el usuario"));
-                    Cart cart = new Cart();
-                    cart.setUser(user);
-                    return cartsRepository.save(cart);
-                });
+    public CartResponse getCart(Long userId) {
+        return toResponse(getOrCreateCart(userId));
     }
 
     @Transactional
-    public CartItem addItem(Long userId, Long productId, Integer quantity) {
+    public CartItemResponse addItem(Long userId, Long productId, Integer quantity) {
         Cart cart = getOrCreateCart(userId);
 
         Product product = productsRepository.findById(productId)
@@ -67,39 +60,36 @@ public class CartService {
             throw new IllegalStateException("El producto no está disponible");
         }
 
-        return cartItemsRepository.findByCartId(cart.getId()).stream()
-                .filter(item -> item.getProduct().getId().equals(productId))
-                .findFirst()
+        CartItem item = cartItemsRepository.findByCartIdAndProductId(cart.getId(), productId)
                 .map(existing -> {
                     existing.setQuantity(existing.getQuantity() + quantity);
-                    return cartItemsRepository.save(existing);
+                    return existing;
                 })
                 .orElseGet(() -> {
-                    CartItem item = new CartItem();
-                    item.setCart(cart);
-                    item.setProduct(product);
-                    item.setQuantity(quantity);
-                    return cartItemsRepository.save(item);
+                    CartItem created = new CartItem();
+                    created.setCart(cart);
+                    created.setProduct(product);
+                    created.setQuantity(quantity);
+                    return created;
                 });
+
+        return CartItemResponse.from(cartItemsRepository.save(item));
     }
 
     @Transactional
-    public CartItem updateItem(Long userId, Long productId, Integer quantity) {
+    public CartItemResponse updateItem(Long userId, Long productId, Integer quantity) {
         Cart cart = getOrCreateCart(userId);
 
-        return cartItemsRepository.findByCartIdAndProductId(cart.getId(), productId)
-                .map(item -> {
-                    item.setQuantity(quantity);
-                    return cartItemsRepository.save(item);
-                })
-                .orElseThrow(() -> new NoSuchElementException(
-                        "El producto no está en el carrito"));
+        CartItem item = cartItemsRepository.findByCartIdAndProductId(cart.getId(), productId)
+                .orElseThrow(() -> new NoSuchElementException("El producto no está en el carrito"));
+
+        item.setQuantity(quantity);
+        return CartItemResponse.from(cartItemsRepository.save(item));
     }
 
     @Transactional
     public void removeItem(Long userId, Long productId) {
         Cart cart = getOrCreateCart(userId);
-
         cartItemsRepository.findByCartIdAndProductId(cart.getId(), productId)
                 .ifPresent(cartItemsRepository::delete);
     }
@@ -110,8 +100,18 @@ public class CartService {
         cartItemsRepository.deleteByCartId(cart.getId());
     }
 
-    public List<CartItem> getItems(Long userId) {
-        Cart cart = getOrCreateCart(userId);
-        return cartItemsRepository.findByCartId(cart.getId());
+    private CartResponse toResponse(Cart cart) {
+        return CartResponse.from(cart, cartItemsRepository.findByCartId(cart.getId()));
+    }
+
+    private Cart getOrCreateCart(Long userId) {
+        return cartsRepository.findByUserId(userId)
+                .orElseGet(() -> {
+                    User user = usersRepository.findById(userId)
+                            .orElseThrow(() -> new NoSuchElementException("No existe el usuario"));
+                    Cart cart = new Cart();
+                    cart.setUser(user);
+                    return cartsRepository.save(cart);
+                });
     }
 }
