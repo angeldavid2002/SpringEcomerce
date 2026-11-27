@@ -12,6 +12,7 @@ import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
@@ -29,6 +30,9 @@ import java.net.URI;
  * <ul>
  *   <li>El endpoint y la región se configuran a mano: B2 no es AWS y no se
  *       descubren solos.</li>
+ *   <li>B2 no soporta el estilo virtual-host: el bucket va en la ruta
+ *       ({@code https://s3.<region>.backblazeb2.com/<bucket>/<clave>}), así que
+ *       se fuerza {@code pathStyleAccessEnabled}.</li>
  *   <li>B2 rechaza la cabecera {@code x-amz-sdk-checksum-algorithm}, así que el
  *       cálculo de checksums se limita a {@code WHEN_REQUIRED}.</li>
  *   <li>El bucket es privado: las lecturas se sirven con URL firmada.</li>
@@ -46,18 +50,23 @@ public class B2ImageStorage implements IImageStorage {
 
     public B2ImageStorage(StorageProperties properties) {
         this.properties = properties;
+        S3Configuration pathStyle = S3Configuration.builder()
+                .pathStyleAccessEnabled(true)
+                .build();
         this.client = S3Client.builder()
                 .endpointOverride(URI.create(properties.getEndpoint()))
                 .region(Region.of(properties.getRegion()))
                 .credentialsProvider(StaticCredentialsProvider.create(
                         AwsBasicCredentials.create(properties.getAccessKey(), properties.getSecretKey())))
                 .requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED)
+                .serviceConfiguration(pathStyle)
                 .build();
         this.presigner = S3Presigner.builder()
                 .endpointOverride(URI.create(properties.getEndpoint()))
                 .region(Region.of(properties.getRegion()))
                 .credentialsProvider(StaticCredentialsProvider.create(
                         AwsBasicCredentials.create(properties.getAccessKey(), properties.getSecretKey())))
+                .serviceConfiguration(pathStyle)
                 .build();
     }
 
@@ -103,13 +112,14 @@ public class B2ImageStorage implements IImageStorage {
             return null;
         }
         try {
+            // El presigner devuelve un PresignedGetObjectRequest: la URL está en .url().
             return presigner.presignGetObject(GetObjectPresignRequest.builder()
                     .signatureDuration(properties.getPresignExpiration())
                     .getObjectRequest(GetObjectRequest.builder()
                             .bucket(properties.getBucket())
                             .key(key)
                             .build())
-                    .build()).toString();
+                    .build()).url().toString();
         } catch (SdkException e) {
             log.warn("No se pudo firmar la URL de la imagen {}: {}", key, e.getMessage());
             return null;
