@@ -88,6 +88,7 @@ B2_PRESIGN_EXPIRATION=PT30M
 B2_MAX_FILE_SIZE=5242880
 B2_ALLOWED_CONTENT_TYPES=image/jpeg,image/png,image/webp,image/gif
 B2_PREFIX=products
+B2_CATEGORY_PREFIX=categories
 ```
 
 `spring.config.import=optional:file:.env[.properties]` loads `.env` as a properties file. Real
@@ -114,7 +115,8 @@ environment variables still work and take precedence, so CI and production can i
 | `B2_PRESIGN_EXPIRATION` | No | `PT30M` | Lifetime of the signed URLs returned to the client |
 | `B2_MAX_FILE_SIZE` | No | `5242880` | Max bytes per image |
 | `B2_ALLOWED_CONTENT_TYPES` | No | `image/jpeg,image/png,image/webp,image/gif` | Accepted image types |
-| `B2_PREFIX` | No | `products` | Key prefix inside the bucket |
+| `B2_PREFIX` | No | `products` | Key prefix for product images inside the bucket |
+| `B2_CATEGORY_PREFIX` | No | `categories` | Key prefix for category images inside the bucket |
 
 The application refuses to start if `JWT_SECRET` is missing or too short for the selected algorithm,
 or if the seed is enabled without its four credentials.
@@ -443,13 +445,13 @@ Unknown email, wrong password and inactive user all return the same `401` with
 | Resource | Base path | Endpoints |
 | --- | --- | ---: |
 | Auth | `/auth` | 2 |
-| Categories | `/categories` | 6 |
+| Categories | `/categories` | 8 |
 | Products | `/products` | 8 |
 | Inventories | `/inventories` | 9 |
 | Users | `/users` | 9 |
 | Addresses | `/addresses` | 6 |
 | Orders | `/orders` | 13 |
-| **Total** | | **55** |
+| **Total** | | **56** |
 
 ### Suggested order of use
 
@@ -538,6 +540,8 @@ curl -s -X PATCH "$BASE/orders/$ORDER_ID/status" \
 - No hay endpoint para cambiar el usuario o la dirección de un pedido existente.
 - Imágenes: `POST /products` y `PUT /products/{id}` aceptan `multipart/form-data` con un campo `image`;
   la respuesta incluye `imageUrl` como **URL firmada y temporal** (`presigned`), nunca la clave del bucket.
+- Imágenes de categoría: `POST /categories` y `PUT /categories/{id}` aceptan el mismo campo `image`, y
+  `DELETE /categories/{id}/image` quita solo la imagen. Mismo contrato que los productos, con prefijo propio.
 
 ### Status codes
 
@@ -585,8 +589,8 @@ A `401` uses the same shape:
 
 ## Images (Backblaze B2)
 
-Product images live in a private [Backblaze B2](https://www.backblaze.com/cloud-storage) bucket,
-addressed through B2's S3-compatible API with the AWS SDK v2 (`software.amazon.awssdk:s3`).
+Product and category images live in a private [Backblaze B2](https://www.backblaze.com/cloud-storage)
+bucket, addressed through B2's S3-compatible API with the AWS SDK v2 (`software.amazon.awssdk:s3`).
 
 Rules the API follows:
 
@@ -597,11 +601,15 @@ Rules the API follows:
 | Edited without an image (JSON) | Leaves the bucket object untouched |
 | `DELETE /products/{id}/image` | Deletes the object, keeps the product |
 | `DELETE /products/{id}` | Deletes the product and its image |
+| Category created with an image | Uploads the file as `categories/{id}/{uuid}.{ext}` and stores that key in `categories.image_key` |
+| Category edited with a new image | Deletes the previous key, uploads the new one, updates the key |
+| `DELETE /categories/{id}/image` | Deletes the object, keeps the category |
+| `DELETE /categories/{id}` | Deletes the category and its image (only when it has no products) |
 
 - The response never exposes the object key: `imageUrl` is a **signed URL** valid for
-  `B2_PRESIGN_EXPIRATION` (30 minutes by default).
-- `image_url` is still there for images hosted elsewhere. If a product has an `image_key`, the bucket
-  image wins and `image_url` is ignored.
+  `B2_PRESIGN_EXPIRATION` (30 minutes by default), for products and categories alike.
+- `image_url` is still there for product images hosted elsewhere. If a product has an `image_key`, the
+  bucket image wins and `image_url` is ignored.
 - Only images are accepted (`B2_ALLOWED_CONTENT_TYPES`), at most `B2_MAX_FILE_SIZE` bytes; anything
   else returns `400`.
 - `B2_ENABLED=false` keeps the API running without a bucket: the rest of the endpoints behave
@@ -622,31 +630,42 @@ curl -X POST http://localhost:8080/products \
   -F "price=999.99" \
   -F "categoryId=130" \
   -F "image=@portada.png"
+
+curl -X POST http://localhost:8080/categories \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "name=Computers" \
+  -F "description=Laptops and accessories" \
+  -F "image=@computers.png"
 ```
 
 ---
 
 ## Tests
 
-The suite is split by module instead of living in a single file. There are 148 tests.
+The suite is split by module instead of living in a single file. There are 160 tests.
 
 | Type | Class | Tests | What it covers |
 | --- | --- | ---: | --- |
 | Context | `EcomerceApplicationTests` | 1 | The application context starts |
-| Slice | `CategoryControllerTest` | 5 | CRUD contract, validation, `409` on delete, admin vs public listing |
-| Slice | `ProductsControllerTest` | 10 | Search, category filter, stock/availability, create, deactivate, delete conflict, admin vs public listing |
+| Slice | `CategoryControllerTest` | 9 | CRUD contract, validation, image upload, signed URL, delete image, admin vs public listing |
+| Slice | `ProductsControllerTest` | 15 | Search, category filter, stock/availability, create, image upload, signed URL, deactivate, delete conflict, admin vs public listing |
 | Slice | `InventoryControllerTest` | 7 | Create, validation, low stock list, stock movements, delete |
 | Slice | `UsersControllerTest` | 7 | Create, email validation, lookup, `GET /me`, deactivate, delete conflict |
 | Slice | `AddressesControllerTest` | 6 | Create, validation, own addresses, delete rules |
 | Slice | `OrdersControllerTest` | 9 | Create, invalid status, items, status change, payment, cancel, delete |
 | Slice | `AuthControllerTest` | 5 | Login response, public registration, validation, bad credentials |
 | Integration | `CatalogIntegrationTest` | 7 | Unique category, product FK, low stock/overdraft, active search, public stock, admin sees inactive |
-| Integration | `CustomerIntegrationTest` | 2 | Email normalization, duplicate email, address ownership |
+| Integration | `CustomerIntegrationTest` | 3 | Email normalization, duplicate email, address ownership |
 | Integration | `OrderLifecycleIntegrationTest` | 5 | Full purchase, totals, stock, invalid transitions, address ownership |
 | Integration | `SecurityIntegrationTest` | 9 | Public reads, `401`/`403` problem details, admin access, real login, `GET /users/me` |
 | Integration | `OwnershipIntegrationTest` | 14 | `/me` endpoints, cross-user access to orders and addresses, `ADMIN` bypass |
 | Integration | `PaymentIntegrationTest` | 4 | Owner payment, stock deduction, cross-user `404`, insufficient stock |
+| Integration | `ProductImageIntegrationTest` | 8 | Product image lifecycle against a fake bucket: create, replace, remove, delete, invalid type/size, admin only |
+| Integration | `CategoryImageIntegrationTest` | 7 | Category image lifecycle against a fake bucket: create, replace, remove, delete, invalid type, admin only |
 | Integration | `RegistrationIntegrationTest` | 2 | Public registration, forced `CUSTOMER` role, duplicate email |
+| Unit | `B2ImageStorageTest` | 6 | Path-style presigned URL, signature, expiration and blank keys |
+| Unit | `ProductImageFlowTest` | 2 | Product key stored in the bucket and deactivation keeps the image |
+| Unit | `CategoryImageFlowTest` | 2 | Category key stored in the bucket and removing the image deletes the object |
 
 - **Slice tests** use `@WebMvcTest` + `@MockitoBean` with `addFilters = false`: they check the HTTP
   contract without a database or the security chain.
@@ -663,7 +682,8 @@ Test sources:
 src/test/java/com/angel/ecomerce/
 ├── EcomerceApplicationTests.java
 ├── controller/        # one class per module
-├── integration/       # catalog, customers, order lifecycle, security + shared base
+├── integration/       # catalog, customers, order lifecycle, security, images + shared base
+├── service/           # image rules and presigned URL, without Spring
 └── support/           # TestFixtures
 ```
 
