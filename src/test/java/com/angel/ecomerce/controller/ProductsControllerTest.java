@@ -4,6 +4,8 @@ import com.angel.ecomerce.entity.Category;
 import com.angel.ecomerce.entity.Product;
 import com.angel.ecomerce.security.OwnershipGuard;
 import com.angel.ecomerce.service.products.IProduct;
+import com.angel.ecomerce.service.storage.IImageStorage;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -12,21 +14,25 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.UnaryOperator;
 
 import static com.angel.ecomerce.support.TestFixtures.category;
 import static com.angel.ecomerce.support.TestFixtures.inventory;
 import static com.angel.ecomerce.support.TestFixtures.product;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -45,6 +51,18 @@ class ProductsControllerTest {
 
     @MockitoBean
     private OwnershipGuard ownershipGuard;
+
+    @MockitoBean
+    private IImageStorage imageStorage;
+
+    @BeforeEach
+    void stubStorage() {
+        given(imageStorage.presignedUrl(anyString()))
+                .willAnswer(invocation -> {
+                    String key = invocation.getArgument(0);
+                    return key == null ? null : "https://firmada.example/" + key;
+                });
+    }
 
     // --- Consultas ---
 
@@ -120,12 +138,25 @@ class ProductsControllerTest {
     void getByIdIncludesStockAndAvailability() throws Exception {
         Product product = product(1L, "Libro de Java", "19.99", category(1L, "Libros"));
         product.setInventory(inventory(1L, product, 7, 2));
+        product.setImageKey("products/1/clave.jpg");
         given(productsService.findById(1L)).willReturn(Optional.of(product));
 
         mockMvc.perform(get("/products/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.stock").value(7))
-                .andExpect(jsonPath("$.available").value(true));
+                .andExpect(jsonPath("$.available").value(true))
+                // Nunca se devuelve la clave del bucket, sino una URL firmada.
+                .andExpect(jsonPath("$.imageUrl").value("https://firmada.example/products/1/clave.jpg"));
+    }
+
+    @Test
+    void getByIdKeepsExternalImageUrlWhenThereIsNoBucketObject() throws Exception {
+        Product product = product(1L, "Libro de Java", "19.99", category(1L, "Libros"));
+        given(productsService.findById(1L)).willReturn(Optional.of(product));
+
+        mockMvc.perform(get("/products/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.imageUrl").value("https://example.com/1.png"));
     }
 
     @Test
@@ -164,6 +195,30 @@ class ProductsControllerTest {
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.categoryId").value(1))
                 .andExpect(jsonPath("$.categoryName").value("Libros"));
+    }
+
+    @Test
+    void createWithImageUploadsToTheBucketAndReturnsPresignedUrl() throws Exception {
+        Product saved = product(1L, "Libro de Java", "19.99", category(1L, "Libros"));
+        saved.setImageKey("products/1/clave.png");
+        given(productsService.save(any(Product.class), any())).willReturn(saved);
+
+        mockMvc.perform(multipart("/products")
+                        .file(new MockMultipartFile("image", "portada.png", MediaType.IMAGE_PNG_VALUE, "binarios".getBytes()))
+                        .param("name", "Libro de Java")
+                        .param("description", "Libro")
+                        .param("price", "19.99")
+                        .param("categoryId", "1"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.imageUrl").value("https://firmada.example/products/1/clave.png"));
+    }
+
+    @Test
+    void deleteImageReturns204() throws Exception {
+        mockMvc.perform(delete("/products/1/image"))
+                .andExpect(status().isNoContent());
+
+        verify(productsService).removeImage(1L);
     }
 
     @Test
