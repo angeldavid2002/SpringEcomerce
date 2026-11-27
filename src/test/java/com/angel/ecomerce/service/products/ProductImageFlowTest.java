@@ -33,7 +33,7 @@ import static org.mockito.Mockito.verify;
  * propio del servicio: la clave que guarda y que desactivar no toca el bucket.</p>
  */
 @ExtendWith(MockitoExtension.class)
-class ProductsImageFlowTest {
+class ProductImageFlowTest {
 
     @Mock
     private ProductsRepository productsRepository;
