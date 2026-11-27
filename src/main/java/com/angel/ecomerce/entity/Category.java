@@ -26,6 +26,14 @@ public class Category {
 
     private String description;
 
+    /**
+     * Clave del objeto de imagen en el bucket de imágenes (Backblaze B2). NULL
+     * si la categoría no tiene imagen almacenada. La URL que ve el frontend se
+     * firma al vuelo a partir de esta clave.
+     */
+    @Column(name = "image_key")
+    private String imageKey;
+
     @Column(nullable = false)
     private boolean active = true;
 

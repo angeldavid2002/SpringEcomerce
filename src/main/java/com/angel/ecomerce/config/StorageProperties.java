@@ -45,8 +45,11 @@ public class StorageProperties {
     /** Tipos permitidos: solo imágenes. */
     private List<String> allowedContentTypes = List.of("image/jpeg", "image/png", "image/webp", "image/gif");
 
-    /** Prefijo de las claves dentro del bucket. */
+    /** Prefijo de las claves de producto dentro del bucket. */
     private String prefix = "products";
+
+    /** Prefijo de las claves de categoría dentro del bucket. */
+    private String categoryPrefix = "categories";
 
     @jakarta.annotation.PostConstruct
     public void validate() {
@@ -58,6 +61,8 @@ public class StorageProperties {
         require(bucket, "app.storage.b2.bucket (B2_BUCKET)");
         require(accessKey, "app.storage.b2.access-key (B2_ACCESS_KEY)");
         require(secretKey, "app.storage.b2.secret-key (B2_SECRET_KEY)");
+        require(prefix, "app.storage.b2.prefix (B2_PREFIX)");
+        require(categoryPrefix, "app.storage.b2.category-prefix (B2_CATEGORY_PREFIX)");
         if (presignExpiration == null || presignExpiration.isZero() || presignExpiration.isNegative()) {
             throw new IllegalArgumentException("app.storage.b2.presign-expiration debe ser una duración positiva");
         }
