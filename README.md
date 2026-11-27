@@ -608,6 +608,9 @@ Rules the API follows:
   normally and image uploads answer `503` instead of failing at startup.
 - B2 rejects the SDK's `x-amz-sdk-checksum-algorithm` header, so the client is built with
   `requestChecksumCalculation(WHEN_REQUIRED)`.
+- B2 does not support virtual-host style, so both the client and the presigner force
+  `pathStyleAccessEnabled(true)`; a signed URL looks like
+  `https://s3.<region>.backblazeb2.com/<bucket>/<key>?X-Amz-Algorithm=...&X-Amz-Signature=...`.
 
 Upload an image with `multipart/form-data`:
 
@@ -625,7 +628,7 @@ curl -X POST http://localhost:8080/products \
 
 ## Tests
 
-The suite is split by module instead of living in a single file. There are 151 tests.
+The suite is split by module instead of living in a single file. There are 157 tests.
 
 | Type | Class | Tests | What it covers |
 | --- | --- | ---: | --- |
