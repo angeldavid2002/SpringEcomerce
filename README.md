@@ -628,21 +628,21 @@ curl -X POST http://localhost:8080/products \
 
 ## Tests
 
-The suite is split by module instead of living in a single file. There are 157 tests.
+The suite is split by module instead of living in a single file. There are 148 tests.
 
 | Type | Class | Tests | What it covers |
 | --- | --- | ---: | --- |
 | Context | `EcomerceApplicationTests` | 1 | The application context starts |
 | Slice | `CategoryControllerTest` | 5 | CRUD contract, validation, `409` on delete, admin vs public listing |
 | Slice | `ProductsControllerTest` | 10 | Search, category filter, stock/availability, create, deactivate, delete conflict, admin vs public listing |
-| Slice | `InventoryControllerTest` | 6 | Create, validation, low stock list, stock movements, delete |
+| Slice | `InventoryControllerTest` | 7 | Create, validation, low stock list, stock movements, delete |
 | Slice | `UsersControllerTest` | 7 | Create, email validation, lookup, `GET /me`, deactivate, delete conflict |
 | Slice | `AddressesControllerTest` | 6 | Create, validation, own addresses, delete rules |
-| Slice | `OrdersControllerTest` | 10 | Create, invalid status, items, status change, owner payment, cancel, delete |
+| Slice | `OrdersControllerTest` | 9 | Create, invalid status, items, status change, payment, cancel, delete |
 | Slice | `AuthControllerTest` | 5 | Login response, public registration, validation, bad credentials |
 | Integration | `CatalogIntegrationTest` | 7 | Unique category, product FK, low stock/overdraft, active search, public stock, admin sees inactive |
 | Integration | `CustomerIntegrationTest` | 2 | Email normalization, duplicate email, address ownership |
-| Integration | `OrderLifecycleIntegrationTest` | 6 | Full purchase, totals, stock, invalid transitions, address ownership |
+| Integration | `OrderLifecycleIntegrationTest` | 5 | Full purchase, totals, stock, invalid transitions, address ownership |
 | Integration | `SecurityIntegrationTest` | 9 | Public reads, `401`/`403` problem details, admin access, real login, `GET /users/me` |
 | Integration | `OwnershipIntegrationTest` | 14 | `/me` endpoints, cross-user access to orders and addresses, `ADMIN` bypass |
 | Integration | `PaymentIntegrationTest` | 4 | Owner payment, stock deduction, cross-user `404`, insufficient stock |
