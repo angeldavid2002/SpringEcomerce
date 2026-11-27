@@ -87,30 +87,7 @@ class OrderLifecycleIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.totalAmount").value(0.00));
     }
 
-    @Test
-    void paymentFailsWhenStockIsInsufficient() throws Exception {
-        String suffix = suffix();
-        long categoryId = createCategory(suffix);
-        long productId = createProduct(categoryId, "Product " + suffix, "19.99");
-        createInventory(productId, 1, 0);
-        long userId = createUser(suffix);
-        long addressId = createAddress(userId);
-        long orderId = createOrder(userId, addressId);
-
-        addItem(orderId, productId, 2);
-
-        performAsAdmin(patch("/orders/{orderId}/status", orderId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"status":"PAID"}
-                                """))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.detail").isNotEmpty());
-
-        performAsAdmin(get("/orders/{id}", orderId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("PENDING"));
-    }
+    // El caso "pagar sin stock" se cubre en PaymentIntegrationTest.payFailsWhenStockIsInsufficient.
 
     @Test
     void invalidTransitionFromPendingToDeliveredReturns400() throws Exception {

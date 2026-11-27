@@ -105,14 +105,17 @@ class InventoryControllerTest {
                 .andExpect(jsonPath("$.stock").value(15));
     }
 
-    @Test
-    void decreaseWithInsufficientStockReturns409() throws Exception {
-        given(inventoryService.decreaseStock(1L, 99))
-                .willThrow(new IllegalStateException("Stock insuficiente para el producto con id 1"));
+    // El 409 por stock insuficiente se prueba en CatalogIntegrationTest.inventoryTracksLowStockAndRejectsOverdraft.
 
-        mockMvc.perform(patch("/inventories/product/1/decrease").param("quantity", "99"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.detail").value("Stock insuficiente para el producto con id 1"));
+    @Test
+    void decreaseReturnsUpdatedInventory() throws Exception {
+        Product product = product(1L, "Libro de Java", "19.99", category(1L, "Libros"));
+        given(inventoryService.decreaseStock(1L, 5))
+                .willReturn(inventory(10L, product, 5, 2));
+
+        mockMvc.perform(patch("/inventories/product/1/decrease").param("quantity", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.stock").value(5));
     }
 
     // --- Borrado ---
