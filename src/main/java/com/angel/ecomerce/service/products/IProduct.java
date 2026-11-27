@@ -1,5 +1,6 @@
 package com.angel.ecomerce.service.products;
 
+import com.angel.ecomerce.dto.storage.ImageUpload;
 import com.angel.ecomerce.entity.Product;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -10,6 +11,9 @@ import java.util.Optional;
 
 public interface IProduct {
     Product save(Product product);
+
+    /** Alta con imagen: la imagen se sube al bucket dentro de la misma transacción. */
+    Product save(Product product, ImageUpload image);
 
     List<Product> getAll();
 
@@ -46,6 +50,15 @@ public interface IProduct {
     Optional<Product> findById(Long id);
 
     Product updateById(Long id, Product updatedProduct);
+
+    /**
+     * Actualización con imagen: si llega imagen se borra la anterior del bucket,
+     * se sube la nueva y se guarda la clave en el producto.
+     */
+    Product updateById(Long id, Product updatedProduct, ImageUpload image);
+
+    /** Quita la imagen del bucket y del producto. */
+    void removeImage(Long id);
 
     void deactivateById(Long id);
 

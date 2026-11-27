@@ -1,10 +1,13 @@
 package com.angel.ecomerce.service.products;
 
+import com.angel.ecomerce.config.StorageProperties;
+import com.angel.ecomerce.dto.storage.ImageUpload;
 import com.angel.ecomerce.entity.Category;
 import com.angel.ecomerce.entity.Product;
 import com.angel.ecomerce.repository.CategoriesRepository;
 import com.angel.ecomerce.repository.OrderItemsRepository;
 import com.angel.ecomerce.repository.ProductsRepository;
+import com.angel.ecomerce.service.storage.IImageStorage;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -15,25 +18,42 @@ import java.math.RoundingMode;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @Transactional(readOnly = true)
 public class ProductsService implements IProduct {
+
+    /** Claves del bucket: {@code products/<id-producto>/<uuid>.<ext>}. */
+    private static final String IMAGE_KEY_PATTERN = "%s/%d/%s.%s";
+
     private final ProductsRepository productsRepository;
     private final CategoriesRepository categoriesRepository;
     private final OrderItemsRepository orderItemsRepository;
+    private final IImageStorage imageStorage;
+    private final StorageProperties storageProperties;
 
     public ProductsService(ProductsRepository productsRepository,
                            CategoriesRepository categoriesRepository,
-                           OrderItemsRepository orderItemsRepository) {
+                           OrderItemsRepository orderItemsRepository,
+                           IImageStorage imageStorage,
+                           StorageProperties storageProperties) {
         this.productsRepository = productsRepository;
         this.categoriesRepository = categoriesRepository;
         this.orderItemsRepository = orderItemsRepository;
+        this.imageStorage = imageStorage;
+        this.storageProperties = storageProperties;
     }
 
     @Override
     @Transactional
     public Product save(Product product) {
+        return save(product, null);
+    }
+
+    @Override
+    @Transactional
+    public Product save(Product product, ImageUpload image) {
         if (product == null) {
             throw new IllegalArgumentException("El producto es obligatorio");
         }
@@ -49,7 +69,12 @@ public class ProductsService implements IProduct {
             product.setRating(BigDecimal.ZERO);
         }
         product.setActive(true);
-        return productsRepository.save(product);
+
+        Product saved = productsRepository.save(product);
+        if (image != null) {
+            storeImage(saved, image);
+        }
+        return saved;
     }
 
     @Override
@@ -189,6 +214,12 @@ public class ProductsService implements IProduct {
     @Override
     @Transactional
     public Product updateById(Long id, Product updatedProduct) {
+        return updateById(id, updatedProduct, null);
+    }
+
+    @Override
+    @Transactional
+    public Product updateById(Long id, Product updatedProduct, ImageUpload image) {
         if (id == null) {
             throw new IllegalArgumentException("El id del producto es obligatorio");
         }
@@ -210,6 +241,9 @@ public class ProductsService implements IProduct {
                     existingProduct.setCategory(category);
                     if (updatedProduct.getRating() != null) {
                         existingProduct.setRating(updatedProduct.getRating());
+                    }
+                    if (image != null) {
+                        replaceImage(existingProduct, image);
                     }
                     return productsRepository.save(existingProduct);
                 })
@@ -235,13 +269,79 @@ public class ProductsService implements IProduct {
         if (id == null) {
             throw new IllegalArgumentException("El id del producto es obligatorio");
         }
-        if (!productsRepository.existsById(id)) {
-            throw new NoSuchElementException("No existe un producto con ese id");
-        }
+        Product product = productsRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("No existe un producto con ese id"));
         if (orderItemsRepository.existsByProductId(id)) {
             throw new IllegalStateException("No se puede eliminar el producto porque está asociado a pedidos; desactívelo en su lugar");
         }
-        productsRepository.deleteById(id);
+
+        // La imagen se borra del bucket antes que la fila.
+        if (product.getImageKey() != null && !product.getImageKey().isBlank()) {
+            imageStorage.delete(product.getImageKey());
+            product.setImageKey(null);
+        }
+        productsRepository.delete(product);
+    }
+
+    /** Borra solo la imagen del bucket y deja el producto sin imagen. */
+    @Transactional
+    public void removeImage(Long id) {
+        if (id == null) {
+            throw new IllegalArgumentException("El id del producto es obligatorio");
+        }
+        Product product = productsRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("No existe un producto con ese id"));
+
+        if (product.getImageKey() != null && !product.getImageKey().isBlank()) {
+            imageStorage.delete(product.getImageKey());
+            product.setImageKey(null);
+            productsRepository.save(product);
+        }
+    }
+
+    private void storeImage(Product product, ImageUpload image) {
+        requireValidImage(image);
+        String key = imageKeyFor(product.getId(), image);
+        imageStorage.store(key, image);
+        product.setImageKey(key);
+        // La imagen del bucket sustituye a cualquier URL externa anterior.
+        product.setImageUrl(null);
+        productsRepository.save(product);
+    }
+
+    /**
+     * Reglas de imagen propias del producto (no del proveedor): tipo y tamaño.
+     * Así fallan igual con B2 o con cualquier otro bucket.
+     */
+    private void requireValidImage(ImageUpload image) {
+        if (image == null || !image.hasContent()) {
+            throw new IllegalArgumentException("La imagen está vacía");
+        }
+        String contentType = image.contentTypeOrDefault();
+        if (!storageProperties.getAllowedContentTypes().contains(contentType)) {
+            throw new IllegalArgumentException("Tipo de imagen no permitido (" + contentType
+                    + "). Permitidos: " + storageProperties.getAllowedContentTypes());
+        }
+        if (image.size() > storageProperties.getMaxFileSize()) {
+            throw new IllegalArgumentException("La imagen supera el tamaño máximo de "
+                    + storageProperties.getMaxFileSize() + " bytes");
+        }
+    }
+
+    private void replaceImage(Product product, ImageUpload image) {
+        String previousKey = product.getImageKey();
+        if (previousKey != null && !previousKey.isBlank()) {
+            imageStorage.delete(previousKey);
+        }
+        storeImage(product, image);
+    }
+
+    private String imageKeyFor(Long productId, ImageUpload image) {
+        return IMAGE_KEY_PATTERN.formatted(
+                storageProperties.getPrefix(),
+                productId,
+                UUID.randomUUID(),
+                image.extension());
     }
 
     private Category resolveCategory(Category category) {

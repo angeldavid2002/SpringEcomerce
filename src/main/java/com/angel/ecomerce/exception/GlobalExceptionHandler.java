@@ -1,5 +1,6 @@
 package com.angel.ecomerce.exception;
 
+import com.angel.ecomerce.service.storage.ImageStorageNotConfiguredException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
@@ -32,6 +33,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalStateException.class)
     public ProblemDetail handleConflict(IllegalStateException exception) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+    }
+
+    @ExceptionHandler(ImageStorageNotConfiguredException.class)
+    public ProblemDetail handleStorageMissing(ImageStorageNotConfiguredException exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage());
     }
 
     @ExceptionHandler(BadCredentialsException.class)
