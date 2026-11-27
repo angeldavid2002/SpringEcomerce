@@ -76,6 +76,18 @@ JWT_EXPIRATION=PT1H
 JWT_ALGORITHM=HS256
 
 BCRYPT_STRENGTH=10
+
+# Image storage (Backblaze B2). B2_ENABLED=false disables it: uploads answer 503.
+B2_ENABLED=false
+B2_ENDPOINT=https://s3.us-west-004.backblazeb2.com
+B2_REGION=us-west-004
+B2_BUCKET=your-bucket-name
+B2_ACCESS_KEY=keyID-from-b2
+B2_SECRET_KEY=applicationKey-from-b2
+B2_PRESIGN_EXPIRATION=PT30M
+B2_MAX_FILE_SIZE=5242880
+B2_ALLOWED_CONTENT_TYPES=image/jpeg,image/png,image/webp,image/gif
+B2_PREFIX=products
 ```
 
 `spring.config.import=optional:file:.env[.properties]` loads `.env` as a properties file. Real
@@ -95,6 +107,14 @@ environment variables still work and take precedence, so CI and production can i
 | `JWT_EXPIRATION` | No | `PT1H` | Token lifetime (ISO-8601 duration) |
 | `JWT_ALGORITHM` | No | `HS256` | `HS256`, `HS384` or `HS512` |
 | `BCRYPT_STRENGTH` | No | `10` | BCrypt cost, from 4 to 31 |
+| `B2_ENABLED` | No | `false` | Enables the Backblaze B2 image bucket |
+| `B2_ENDPOINT` / `B2_REGION` | If enabled | — | Bucket endpoint and region, e.g. `https://s3.us-west-004.backblazeb2.com` |
+| `B2_BUCKET` | If enabled | — | Private bucket name |
+| `B2_ACCESS_KEY` / `B2_SECRET_KEY` | If enabled | — | B2 application key (`keyID` / `applicationKey`) |
+| `B2_PRESIGN_EXPIRATION` | No | `PT30M` | Lifetime of the signed URLs returned to the client |
+| `B2_MAX_FILE_SIZE` | No | `5242880` | Max bytes per image |
+| `B2_ALLOWED_CONTENT_TYPES` | No | `image/jpeg,image/png,image/webp,image/gif` | Accepted image types |
+| `B2_PREFIX` | No | `products` | Key prefix inside the bucket |
 
 The application refuses to start if `JWT_SECRET` is missing or too short for the selected algorithm,
 or if the seed is enabled without its four credentials.
@@ -516,6 +536,8 @@ curl -s -X PATCH "$BASE/orders/$ORDER_ID/status" \
 - `PUT /orders/{orderId}/items/{itemId}` con `quantity: 0` elimina el item.
 - `GET /users/me` devuelve el perfil del usuario autenticado.
 - No hay endpoint para cambiar el usuario o la dirección de un pedido existente.
+- Imágenes: `POST /products` y `PUT /products/{id}` aceptan `multipart/form-data` con un campo `image`;
+  la respuesta incluye `imageUrl` como **URL firmada y temporal** (`presigned`), nunca la clave del bucket.
 
 ### Status codes
 
@@ -529,6 +551,7 @@ curl -s -X PATCH "$BASE/orders/$ORDER_ID/status" \
 | `403` | Valid token without the required role |
 | `404` | Missing resource |
 | `409` | Stock conflict, non-`PENDING` order, protected history |
+| `503` | Image requested while the bucket is disabled (`B2_ENABLED=false`) |
 
 Errors use `ProblemDetail`:
 
@@ -560,9 +583,49 @@ A `401` uses the same shape:
 
 ---
 
+## Images (Backblaze B2)
+
+Product images live in a private [Backblaze B2](https://www.backblaze.com/cloud-storage) bucket,
+addressed through B2's S3-compatible API with the AWS SDK v2 (`software.amazon.awssdk:s3`).
+
+Rules the API follows:
+
+| Case | What the backend does |
+| --- | --- |
+| Product created with an image | Uploads the file as `products/{id}/{uuid}.{ext}` and stores that key in `products.image_key` |
+| Product edited with a new image | Deletes the previous key, uploads the new one, updates the key |
+| Edited without an image (JSON) | Leaves the bucket object untouched |
+| `DELETE /products/{id}/image` | Deletes the object, keeps the product |
+| `DELETE /products/{id}` | Deletes the product and its image |
+
+- The response never exposes the object key: `imageUrl` is a **signed URL** valid for
+  `B2_PRESIGN_EXPIRATION` (30 minutes by default).
+- `image_url` is still there for images hosted elsewhere. If a product has an `image_key`, the bucket
+  image wins and `image_url` is ignored.
+- Only images are accepted (`B2_ALLOWED_CONTENT_TYPES`), at most `B2_MAX_FILE_SIZE` bytes; anything
+  else returns `400`.
+- `B2_ENABLED=false` keeps the API running without a bucket: the rest of the endpoints behave
+  normally and image uploads answer `503` instead of failing at startup.
+- B2 rejects the SDK's `x-amz-sdk-checksum-algorithm` header, so the client is built with
+  `requestChecksumCalculation(WHEN_REQUIRED)`.
+
+Upload an image with `multipart/form-data`:
+
+```bash
+curl -X POST http://localhost:8080/products \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "name=Laptop Dell XPS 13" \
+  -F "description=Ultraligera" \
+  -F "price=999.99" \
+  -F "categoryId=130" \
+  -F "image=@portada.png"
+```
+
+---
+
 ## Tests
 
-The suite is split by module instead of living in a single file. There are 98 tests.
+The suite is split by module instead of living in a single file. There are 151 tests.
 
 | Type | Class | Tests | What it covers |
 | --- | --- | ---: | --- |
